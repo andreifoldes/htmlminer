@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 from .crawler import crawl_domain, fetch_firecrawl_map_urls, fetch_sitemap_urls, scrape_firecrawl_urls
 from .agent import AgenticExtractor, MODEL_TIERS
 from .firecrawl_agent import FirecrawlAgentExtractor, SPARK_MODELS
-from .storage import save_results, display_results
+from .storage import save_results, display_results, save_summary_csv
 
 from .database import init_db, create_session, log_event, save_extractions
 
@@ -546,6 +546,11 @@ def process(
     save_results(results, output, metadata=metadata)
     save_extractions(results, session_id)
     console.print(f"\n[bold green]✓[/bold green] Results saved to [bold]{output}[/bold]")
+
+    # Export summary CSV
+    summary_csv_path = "summary.csv"
+    save_summary_csv(results, summary_csv_path)
+
     display_results(results)
     
     # Token Usage stats (only for standard extraction mode)
