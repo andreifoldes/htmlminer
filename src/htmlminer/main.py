@@ -3,12 +3,14 @@ from dotenv import load_dotenv, find_dotenv
 import os
 import sys
 import platform
+from pathlib import Path
 from typing import Optional
 from typing_extensions import Annotated
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich import box
+from rich.prompt import Prompt, Confirm
 import warnings
 from urllib.parse import urlparse
 
@@ -44,6 +46,97 @@ def _check_windows_compatibility():
         except Exception as e:
             console.print(f"[red]Error: Cannot create logs directory on Windows: {e}[/red]")
             raise typer.Exit(code=1)
+
+def _prompt_for_api_key(key_name: str, description: str, url: str, required: bool = True) -> Optional[str]:
+    """
+    Prompts the user for an API key and optionally saves it to .env file.
+
+    Args:
+        key_name: Name of the environment variable (e.g., "GEMINI_API_KEY")
+        description: Human-readable description (e.g., "Gemini API")
+        url: URL where users can get the API key
+        required: Whether the key is required or optional
+
+    Returns:
+        The API key provided by the user, or None if optional and skipped
+    """
+    console.print()
+    if required:
+        console.print(f"[bold yellow]⚠ {key_name} is required but not found in .env file[/bold yellow]")
+    else:
+        console.print(f"[bold blue]ℹ {key_name} not found in .env file[/bold blue]")
+
+    console.print(f"[dim]Get your {description} key from: {url}[/dim]")
+    console.print()
+
+    # Ask if user wants to skip (only if optional)
+    if not required:
+        if not Confirm.ask(f"Do you want to provide {key_name} now?", default=False):
+            return None
+
+    # Prompt for the API key
+    api_key = Prompt.ask(
+        f"[bold]Enter your {description} key[/bold]",
+        password=True  # Hide input for security
+    )
+
+    if not api_key or not api_key.strip():
+        if required:
+            console.print(f"[bold red]Error:[/bold red] {key_name} cannot be empty")
+            raise typer.Exit(code=1)
+        return None
+
+    api_key = api_key.strip()
+
+    # Ask if user wants to save to .env
+    console.print()
+    save_to_env = Confirm.ask(
+        f"[bold]Save {key_name} to .env file?[/bold] (recommended for future runs)",
+        default=True
+    )
+
+    if save_to_env:
+        try:
+            env_file = Path(".env")
+
+            # Read existing .env content if it exists
+            existing_content = ""
+            if env_file.exists():
+                existing_content = env_file.read_text()
+
+            # Check if key already exists in file
+            lines = existing_content.split('\n')
+            key_exists = False
+            new_lines = []
+
+            for line in lines:
+                if line.strip().startswith(f"{key_name}="):
+                    # Replace existing key
+                    new_lines.append(f"{key_name}={api_key}")
+                    key_exists = True
+                else:
+                    new_lines.append(line)
+
+            # Add new key if it doesn't exist
+            if not key_exists:
+                if existing_content and not existing_content.endswith('\n'):
+                    new_lines.append('')  # Add newline before new entry
+                new_lines.append(f"{key_name}={api_key}")
+
+            # Write back to .env
+            env_file.write_text('\n'.join(new_lines))
+            console.print(f"[green]✓[/green] {key_name} saved to .env file")
+
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not save to .env file: {e}[/yellow]")
+            console.print("[dim]You can manually add it to .env later[/dim]")
+    else:
+        console.print(f"[dim]{key_name} will only be used for this session[/dim]")
+
+    # Set the environment variable for current session
+    os.environ[key_name] = api_key
+
+    return api_key
 
 @app.command()
 def version():
@@ -112,12 +205,15 @@ def process(
     if url:
         urls.append(url)
 
+    # Check for Gemini API key (required for all modes except pure firecrawl crawling)
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
-         msg = "Neither GEMINI_API_KEY nor GOOGLE_API_KEY found in environment variables or .env file."
-         console.print(f"[bold red]Error:[/bold red] {msg}")
-         log_event(session_id, "cli", "ERROR", msg)
-         raise typer.Exit(code=1)
+        api_key = _prompt_for_api_key(
+            key_name="GEMINI_API_KEY",
+            description="Gemini API",
+            url="https://aistudio.google.com/app/apikey",
+            required=True
+        )
 
     if gemini_tier not in MODEL_TIERS:
          msg = f"Invalid --gemini-tier '{gemini_tier}'. Choose from: {', '.join(MODEL_TIERS.keys())}."
@@ -138,15 +234,31 @@ def process(
             console.print(f"[bold red]Error:[/bold red] {msg}")
             log_event(session_id, "cli", "ERROR", msg)
             raise typer.Exit(code=1)
-        
+
+        # Firecrawl API key is required for agent mode
         firecrawl_api_key = os.getenv("FIRECRAWL_API_KEY")
         if not firecrawl_api_key:
-            msg = "FIRECRAWL_API_KEY is required for --agent mode. Set it in your .env file."
-            console.print(f"[bold red]Error:[/bold red] {msg}")
-            log_event(session_id, "cli", "ERROR", msg)
-            raise typer.Exit(code=1)
-    elif engine == "firecrawl" and not os.getenv("FIRECRAWL_API_KEY"):
-        console.print(Panel("[yellow]Note: using 'firecrawl' without FIRECRAWL_API_KEY.[/yellow]\nFor best results, create an account at firecrawl.dev and add your API key to .env.", border_style="yellow"))
+            firecrawl_api_key = _prompt_for_api_key(
+                key_name="FIRECRAWL_API_KEY",
+                description="Firecrawl API",
+                url="https://firecrawl.dev/",
+                required=True
+            )
+    elif engine == "firecrawl":
+        # Firecrawl API key is recommended but optional for non-agent crawling
+        firecrawl_api_key = os.getenv("FIRECRAWL_API_KEY")
+        if not firecrawl_api_key:
+            console.print(Panel(
+                "[yellow]Note: using 'firecrawl' without FIRECRAWL_API_KEY.[/yellow]\n"
+                "For best results, you can provide your Firecrawl API key.",
+                border_style="yellow"
+            ))
+            firecrawl_api_key = _prompt_for_api_key(
+                key_name="FIRECRAWL_API_KEY",
+                description="Firecrawl API",
+                url="https://firecrawl.dev/",
+                required=False
+            )
 
 
     import json

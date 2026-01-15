@@ -56,8 +56,29 @@ HTMLMiner is fully compatible with **Windows 10 and 11**. You only need to insta
 1. Install `uv` (PowerShell or winget)
 2. Restart your terminal (for PATH changes)
 3. Run `uv pip install -e .` in the project directory
-4. Create a `.env` file with your API keys (see `.env.template`)
+4. Create a `.env` file with your API keys (see `.env.template`) - **or let the CLI prompt you interactively**
 5. Done! No need to manually install Python or manage environments.
+
+### API Key Setup
+
+HTMLMiner needs API keys to function. You have two options:
+
+**Option 1: Interactive Prompts (Recommended for first-time users)**
+- Just run any command - if API keys are missing, you'll be prompted to enter them
+- The CLI will securely ask for your keys and offer to save them to `.env` automatically
+- Keys are hidden during input for security
+
+**Option 2: Manual Setup**
+- Copy `.env.template` to `.env`
+- Add your API keys:
+  ```bash
+  GEMINI_API_KEY=your_key_here
+  FIRECRAWL_API_KEY=your_key_here  # Optional for some modes
+  ```
+
+**Required Keys:**
+- `GEMINI_API_KEY` - Required for all extraction modes. Get it from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- `FIRECRAWL_API_KEY` - Required for `--agent` mode, optional but recommended for `--engine firecrawl`. Get it from [Firecrawl](https://firecrawl.dev/)
 
 ## Usage
 
