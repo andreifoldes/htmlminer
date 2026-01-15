@@ -1,3 +1,3 @@
-https://deepmind.google/about/
-https://openai.com/safety/
-https://www.anthropic.com/
+https://ai.objectives.institute/
+https://coefficientgiving.org/
+https://www.aisi.gov.uk/
