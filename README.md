@@ -5,7 +5,12 @@ Agentic web domain analyzer powered by Google Gemini and Firecrawl.
 ## Installation
 
 ### What is `uv`?
-`uv` is a fast Python package and project manager from Astral. We use it to create an isolated environment and run the CLI consistently across machines.
+`uv` is a fast Python package and project manager from Astral. **You only need to install `uv`** - it will automatically:
+- Download and install Python 3.10+ if not already available
+- Create and manage an isolated virtual environment
+- Install all dependencies specified in `pyproject.toml`
+
+This ensures the CLI runs consistently across machines without manual Python setup.
 
 ### Install `uv` (any OS)
 Pick one option for your OS, then confirm with `uv --version`.
@@ -38,16 +43,21 @@ This creates a local virtual environment (if needed), installs dependencies, and
 
 ### Windows Compatibility
 
-HTMLMiner is fully compatible with **Windows 10 and 11** when `uv` is installed. Key points:
+HTMLMiner is fully compatible with **Windows 10 and 11**. You only need to install `uv` - everything else is automatic!
 
-- **Requirements:** Python 3.10+ and the `uv` package manager
-- **All commands work identically** on Windows, Linux, and macOS
-- **Cross-platform paths:** All file operations use OS-agnostic path handling
-- **Database storage:** SQLite database stored in `logs/` directory (auto-created)
-- **Environment variables:** Create a `.env` file in the project root with your API keys (see `.env.template`)
+**What `uv` handles for you:**
+- ✅ **Python installation:** Automatically downloads Python 3.10+ if not already installed
+- ✅ **Virtual environment:** Creates and manages an isolated environment
+- ✅ **Dependencies:** Installs all required packages automatically
+- ✅ **Cross-platform paths:** All file operations work identically on Windows, Linux, and macOS
+- ✅ **Database storage:** SQLite database auto-created in `logs/` directory
 
-**Windows-Specific Installation Tip:**
-After installing `uv` using PowerShell or winget, you may need to restart your terminal for the PATH changes to take effect.
+**Setup on Windows:**
+1. Install `uv` (PowerShell or winget)
+2. Restart your terminal (for PATH changes)
+3. Run `uv pip install -e .` in the project directory
+4. Create a `.env` file with your API keys (see `.env.template`)
+5. Done! No need to manually install Python or manage environments.
 
 ## Usage
 
