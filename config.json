@@ -1,0 +1,19 @@
+{
+    "features": [
+        {
+            "name": "Risk",
+            "description": "Any mentioned risks, dangers, or negative impacts of AI development.",
+            "synthesis_topic": "Their risk assessment (ie what risks does AI development pose)"
+        },
+        {
+            "name": "Goal",
+            "description": "High-level goals, missions, or objectives (e.g., 'AI alignment' or global AI agreement).",
+            "synthesis_topic": "The goals (often pretty high-level e.g. 'AI alignment')"
+        },
+        {
+            "name": "Method",
+            "description": "Strategies, activities, or actions taken to achieve the goals (research, grantmaking, policy work, etc.).",
+            "synthesis_topic": "The methods used in service of the goals"
+        }
+    ]
+}

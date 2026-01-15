@@ -1,0 +1,26 @@
+[project]
+name = "htmlminer"
+version = "0.1.0"
+description = "Agentic web domain analyzer CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "typer>=0.9.0",
+    "dspy-ai>=2.1.0",
+    "trafilatura>=1.6.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+    "pandas>=2.0.0",
+    "langextract>=0.0.1",
+    "firecrawl-py>=0.0.15",
+]
+
+[project.scripts]
+htmlminer = "htmlminer.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/htmlminer"]
