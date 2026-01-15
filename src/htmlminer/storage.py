@@ -1,20 +1,39 @@
 import pandas as pd
 from rich.console import Console
 from rich.table import Table
-from typing import List, Dict
+from typing import List, Dict, Optional
+from datetime import datetime
 
 console = Console()
 
-def save_results(results: List[Dict], output_file: str):
+def save_results(results: List[Dict], output_file: str, metadata: Optional[Dict] = None):
     """
-    Saves extraction results to a CSV file.
+    Saves extraction results to a file.
+    For JSON: includes metadata section with dates and parameters.
+    For CSV: saves only the results data.
     """
     if not results:
         console.print("[yellow]No results to save.[/yellow]")
         return
 
     df = pd.DataFrame(results)
-    df.to_csv(output_file, index=False)
+    
+    if output_file.endswith(".json"):
+        import json
+        # Build output with metadata
+        output_data = {
+            "metadata": metadata or {},
+            "results": results
+        }
+        # Add timestamp if not present
+        if "timestamp" not in output_data["metadata"]:
+            output_data["metadata"]["timestamp"] = datetime.now().isoformat()
+        
+        with open(output_file, 'w') as f:
+            json.dump(output_data, f, indent=4, default=str)
+    else:
+        df.to_csv(output_file, index=False)
+        
     console.print(f"[green]Results saved to {output_file}[/green]")
 
 def display_results(results: List[Dict]):

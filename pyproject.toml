@@ -1,7 +1,7 @@
 [project]
 name = "htmlminer"
 version = "0.1.0"
-description = "Agentic web domain analyzer CLI"
+description = "Agentic web domain analyzer powered by Google Gemini and Firecrawl"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
