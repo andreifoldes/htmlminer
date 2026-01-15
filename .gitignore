@@ -82,8 +82,14 @@ ipython_config.py
 # pyenv
 .python-version
 
-# macos
+# macOS
 .DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+*.lnk
+ehthumbs.db
 
 # Environments
 .env

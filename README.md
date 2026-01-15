@@ -5,7 +5,12 @@ Agentic web domain analyzer powered by Google Gemini and Firecrawl.
 ## Installation
 
 ### What is `uv`?
-`uv` is a fast Python package and project manager from Astral. We use it to create an isolated environment and run the CLI consistently across machines.
+`uv` is a fast Python package and project manager from Astral. **You only need to install `uv`** - it will automatically:
+- Download and install Python 3.10+ if not already available
+- Create and manage an isolated virtual environment
+- Install all dependencies specified in `pyproject.toml`
+
+This ensures the CLI runs consistently across machines without manual Python setup.
 
 ### Install `uv` (any OS)
 Pick one option for your OS, then confirm with `uv --version`.
@@ -35,6 +40,45 @@ From the project root (the folder that contains `pyproject.toml`), install HTMLM
 uv pip install -e .
 ```
 This creates a local virtual environment (if needed), installs dependencies, and links the package to your working copy so changes in `src/` are picked up immediately without reinstalling.
+
+### Windows Compatibility
+
+HTMLMiner is fully compatible with **Windows 10 and 11**. You only need to install `uv` - everything else is automatic!
+
+**What `uv` handles for you:**
+- ✅ **Python installation:** Automatically downloads Python 3.10+ if not already installed
+- ✅ **Virtual environment:** Creates and manages an isolated environment
+- ✅ **Dependencies:** Installs all required packages automatically
+- ✅ **Cross-platform paths:** All file operations work identically on Windows, Linux, and macOS
+- ✅ **Database storage:** SQLite database auto-created in `logs/` directory
+
+**Setup on Windows:**
+1. Install `uv` (PowerShell or winget)
+2. Restart your terminal (for PATH changes)
+3. Run `uv pip install -e .` in the project directory
+4. Create a `.env` file with your API keys (see `.env.template`) - **or let the CLI prompt you interactively**
+5. Done! No need to manually install Python or manage environments.
+
+### API Key Setup
+
+HTMLMiner needs API keys to function. You have two options:
+
+**Option 1: Interactive Prompts (Recommended for first-time users)**
+- Just run any command - if API keys are missing, you'll be prompted to enter them
+- The CLI will securely ask for your keys and offer to save them to `.env` automatically
+- Keys are hidden during input for security
+
+**Option 2: Manual Setup**
+- Copy `.env.template` to `.env`
+- Add your API keys:
+  ```bash
+  GEMINI_API_KEY=your_key_here
+  FIRECRAWL_API_KEY=your_key_here  # Optional for some modes
+  ```
+
+**Required Keys:**
+- `GEMINI_API_KEY` - Required for all extraction modes. Get it from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- `FIRECRAWL_API_KEY` - Required for `--agent` mode, optional but recommended for `--engine firecrawl`. Get it from [Firecrawl](https://firecrawl.dev/)
 
 ## Usage
 
@@ -147,6 +191,11 @@ Or list the latest 5 snapshots:
 ```bash
 sqlite3 logs/htmlminer_logs.db "SELECT url, timestamp FROM snapshots ORDER BY timestamp DESC LIMIT 5;"
 ```
+
+**Windows Note:** If `sqlite3` is not available on your Windows system, you can:
+- Install it via `winget install SQLite.SQLite` or download from [sqlite.org](https://www.sqlite.org/download.html)
+- Use a GUI tool like [DB Browser for SQLite](https://sqlitebrowser.org/)
+- Query the database using Python: `python -c "import sqlite3; conn = sqlite3.connect('logs/htmlminer_logs.db'); print(conn.execute('SELECT url FROM snapshots').fetchall())"`
 
 ### Full CLI Options
 ```text
