@@ -36,6 +36,19 @@ uv pip install -e .
 ```
 This creates a local virtual environment (if needed), installs dependencies, and links the package to your working copy so changes in `src/` are picked up immediately without reinstalling.
 
+### Windows Compatibility
+
+HTMLMiner is fully compatible with **Windows 10 and 11** when `uv` is installed. Key points:
+
+- **Requirements:** Python 3.10+ and the `uv` package manager
+- **All commands work identically** on Windows, Linux, and macOS
+- **Cross-platform paths:** All file operations use OS-agnostic path handling
+- **Database storage:** SQLite database stored in `logs/` directory (auto-created)
+- **Environment variables:** Create a `.env` file in the project root with your API keys (see `.env.template`)
+
+**Windows-Specific Installation Tip:**
+After installing `uv` using PowerShell or winget, you may need to restart your terminal for the PATH changes to take effect.
+
 ## Usage
 
 ### Batch Processing (File)
@@ -147,6 +160,11 @@ Or list the latest 5 snapshots:
 ```bash
 sqlite3 logs/htmlminer_logs.db "SELECT url, timestamp FROM snapshots ORDER BY timestamp DESC LIMIT 5;"
 ```
+
+**Windows Note:** If `sqlite3` is not available on your Windows system, you can:
+- Install it via `winget install SQLite.SQLite` or download from [sqlite.org](https://www.sqlite.org/download.html)
+- Use a GUI tool like [DB Browser for SQLite](https://sqlitebrowser.org/)
+- Query the database using Python: `python -c "import sqlite3; conn = sqlite3.connect('logs/htmlminer_logs.db'); print(conn.execute('SELECT url FROM snapshots').fetchall())"`
 
 ### Full CLI Options
 ```text

@@ -1,6 +1,8 @@
 import typer
 from dotenv import load_dotenv, find_dotenv
 import os
+import sys
+import platform
 from typing import Optional
 from typing_extensions import Annotated
 from rich.console import Console
@@ -25,10 +27,30 @@ load_dotenv(find_dotenv())
 app = typer.Typer(pretty_exceptions_show_locals=False)
 console = Console()
 
+def _check_windows_compatibility():
+    """
+    Performs a compatibility check for Windows systems.
+    Validates that required components are available.
+    """
+    if platform.system() == "Windows":
+        # Check Python version
+        if sys.version_info < (3, 10):
+            console.print("[yellow]Warning: Python 3.10 or higher is recommended on Windows.[/yellow]")
+
+        # Validate that the logs directory can be created
+        try:
+            logs_dir = "logs"
+            os.makedirs(logs_dir, exist_ok=True)
+        except Exception as e:
+            console.print(f"[red]Error: Cannot create logs directory on Windows: {e}[/red]")
+            raise typer.Exit(code=1)
+
 @app.command()
 def version():
     """Show the version of the application."""
     console.print("htmlminer v0.1.0")
+    console.print(f"Platform: {platform.system()} {platform.release()}")
+    console.print(f"Python: {sys.version.split()[0]}")
 
 @app.command()
 
@@ -48,6 +70,9 @@ def process(
     """
     Process URLs from a file, snapshot them, and extract AI risk information.
     """
+    # Check Windows compatibility
+    _check_windows_compatibility()
+
     # Modify default output filename based on mode
     if output == "results.json" and agent:
         output = "results_agent.json"
