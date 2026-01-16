@@ -100,7 +100,7 @@ graph TD
     CrawlStrategy --> CheckEngine{Engine & Smart Mode?}
     
     CheckEngine -- "Firecrawl + Smart" --> FetchSitemap[Fetch Sitemap]
-    FetchSitemap --> FilterURLs[Filter Candidates (Domain/Ext)]
+    FetchSitemap --> FilterURLs["Filter Candidates (Domain/Ext)"]
     FilterURLs --> SelectPages{Select Pages}
     
     SelectPages -- "DSPy (LLM)" --> LLMSelect[LLM Selector via DSPy]
@@ -108,7 +108,7 @@ graph TD
     LLMSelect -- "Fail" --> HeuristicSelect[Heuristic Limit Fallback]
     HeuristicSelect --> ScrapePages
     
-    CheckEngine -- "Trafilatura / Simple" --> SimpleCrawl[Crawl Domain (Limit N)]
+    CheckEngine -- "Trafilatura / Simple" --> SimpleCrawl["Crawl Domain (Limit N)"]
     SimpleCrawl --> ScrapePages
     
     %% Extraction Phase
@@ -119,12 +119,12 @@ graph TD
     Truncate --> RawExtract
     
     RawExtract --> LangExtract[LangExtract (Gemini)]
-    LangExtract --> FilterSnippets[Filter: < 5 words & Deduplicate]
+    LangExtract --> FilterSnippets["Filter: < 5 words & Deduplicate"]
     FilterSnippets --> IterateFeatures[For Each Feature: Risk, Goal, Method]
     
     IterateFeatures --> Synthesis{Snippets Found?}
     Synthesis -- Yes --> Top50[Select Top 50 Longest Snippets]
-    Top50 --> DSPySynth[DSPy Synthesis (FeatureSummarizer)]
+    Top50 --> DSPySynth["DSPy Synthesis (FeatureSummarizer)"]
     DSPySynth --> ResultEntry
     Synthesis -- No --> ResultEmpty["Not mentioned"]
     
