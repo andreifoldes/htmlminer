@@ -22,11 +22,12 @@ from urllib.parse import urlparse
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
 from .crawler import crawl_domain, fetch_firecrawl_map_urls, fetch_sitemap_urls, scrape_firecrawl_urls
-from .agent import AgenticExtractor, MODEL_TIERS
+from .graph_state import MODEL_TIERS
+from .graph_workflow import run_htmlminer_workflow
 from .firecrawl_agent import FirecrawlAgentExtractor, SPARK_MODELS
 from .storage import save_results, display_results, save_summary_csv
 
-from .database import init_db, create_session, log_event, save_extractions
+from .database import init_db, create_session, log_event, save_extractions, save_page_relevance, log_step_timing, get_token_usage_report
 from . import __version__
 
 load_dotenv(find_dotenv())
@@ -37,6 +38,7 @@ console = Console()
 _GITHUB_API_BASE = "https://api.github.com/repos/andreifoldes/htmlminer"
 _VERSION_CACHE_PATH = Path("logs") / "version_check.json"
 _VERSION_CHECK_INTERVAL = timedelta(hours=24)
+STEP_TIMEOUT_S = 600
 
 def _check_windows_compatibility():
     """
@@ -265,12 +267,13 @@ def process(
     engine: Annotated[str, typer.Option(help="Engine to use: 'firecrawl' (default) or 'trafilatura'. For Firecrawl, set FIRECRAWL_API_KEY in .env for best results.")] = "firecrawl",
     max_paragraphs: Annotated[int, typer.Option(help="Max paragraphs per dimension in agentic summary")] = 3,
     synthesis_top: Annotated[int, typer.Option(help="Max longest snippets per feature to send to synthesis")] = 50,
-    llm_timeout: Annotated[int, typer.Option(help="Timeout in seconds for LLM requests (Gemini/DSpy). Use 0 to disable.")] = 300,
+    llm_timeout: Annotated[int, typer.Option(help="Timeout in seconds for LLM requests (Gemini/DSpy), capped at 600.")] = STEP_TIMEOUT_S,
     gemini_tier: Annotated[str, typer.Option(help="Gemini model tier: 'cheap' or 'expensive'.")] = "cheap",
     smart: Annotated[bool, typer.Option(help="Enable smart crawling to discover and analyze sub-pages (e.g. /about, /research).")] = True,
     limit: Annotated[int, typer.Option(help="Max pages per feature to select from the sitemap when using --smart. Default 10.")] = 10,
     agent: Annotated[bool, typer.Option(help="Use Firecrawl Agent SDK for extraction (requires FIRECRAWL_API_KEY).")] = False,
     spark_model: Annotated[str, typer.Option(help="Spark model for --agent mode: 'mini' (default) or 'pro'.")] = "mini",
+    langextract: Annotated[bool, typer.Option(help="Enable LangExtract for intermediate extraction. If disabled (default), full page content is used for synthesis.")] = False,
 ):
     """
     Process URLs from a file, snapshot them, and extract AI risk information.
@@ -286,12 +289,15 @@ def process(
     
     init_db()
     session_id = create_session()
+    effective_llm_timeout = llm_timeout if llm_timeout > 0 else STEP_TIMEOUT_S
+    if effective_llm_timeout > STEP_TIMEOUT_S:
+        effective_llm_timeout = STEP_TIMEOUT_S
     log_event(
         session_id,
         "cli",
         "INFO",
         "Started process command",
-        {"file": file, "url": url, "engine": engine, "gemini_tier": gemini_tier, "smart": smart, "limit": limit, "agent": agent, "spark_model": spark_model, "synthesis_top": synthesis_top, "llm_timeout": llm_timeout},
+        {"file": file, "url": url, "engine": engine, "gemini_tier": gemini_tier, "smart": smart, "limit": limit, "agent": agent, "spark_model": spark_model, "synthesis_top": synthesis_top, "llm_timeout": effective_llm_timeout, "step_timeout": STEP_TIMEOUT_S},
     )
 
     mode_label = "Firecrawl Agent" if agent else "Agentic Extraction"
@@ -402,17 +408,15 @@ def process(
             api_key=firecrawl_api_key,
             spark_model=spark_model,
             session_id=session_id,
+            step_timeout_s=STEP_TIMEOUT_S,
         )
         console.print(f"[dim]Using Firecrawl Agent with Spark model: {SPARK_MODELS[spark_model]}[/dim]")
     else:
-        extractor = AgenticExtractor(
-            api_key=api_key,
-            session_id=session_id,
-            extraction_config=extraction_config,
-            model_tier=gemini_tier,
-            synthesis_top=synthesis_top,
-            llm_timeout_s=llm_timeout if llm_timeout > 0 else None,
-        )
+        # Standard mode: Use LangGraph workflow
+        extractor = None  # Graph workflow is invoked per-URL
+        firecrawl_api_key = os.getenv("FIRECRAWL_API_KEY")
+        model_info = MODEL_TIERS.get(gemini_tier, MODEL_TIERS["cheap"])
+        console.print(f"[dim]Using LangGraph workflow with model: {model_info['langchain_model']}[/dim]")
 
     from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
 
@@ -429,6 +433,7 @@ def process(
         overall_task = progress.add_task(f"[bold green]Processing {len(urls)} URLs...", total=len(urls))
 
         sitemap_by_url = {}
+        relevance_scores_by_url = {}  # Track relevance scores across all URLs
         for url_to_process in urls:
             progress.update(overall_task, description=f"[bold]Processing {url_to_process}...")
             log_event(session_id, "cli", "INFO", f"Processing {url_to_process}")
@@ -443,7 +448,10 @@ def process(
                     progress.update(current_task, description=f"Running Firecrawl Agent on {url_to_process}...")
                     
                     def update_agent_status(msg):
-                        progress.update(current_task, description=msg)
+                        if msg.startswith("✓"):
+                            progress.console.print(f"  [green]{msg}[/green]")
+                        else:
+                            progress.update(current_task, description=msg)
                     
                     extraction = extractor.run(
                         url=url_to_process,
@@ -454,191 +462,57 @@ def process(
                     sitemap_by_url[url_to_process] = list(sitemap_urls)
                     progress.console.print(f"  [green]✓[/green] Agent extraction complete for {url_to_process}")
                 else:
-                    # Standard mode: Crawl + Extract
-                    # Check for cached snapshot
-                    from .database import get_latest_snapshot
-                    from datetime import datetime, timedelta
-
-                    snapshot = None
-                    crawl_results = []
-                    cached = get_latest_snapshot(url_to_process, engine)
+                    # Standard mode: Use LangGraph workflow
+                    progress.update(current_task, description=f"Running LangGraph workflow on {url_to_process}...")
                     
-                    if cached:
-                        content, timestamp = cached
-                        # SQLite returns timestamp as string, parse it
-                        try:
-                            ts = datetime.fromisoformat(timestamp)
-                        except ValueError:
-                            ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
-
-                        if datetime.now() - ts < timedelta(hours=1):
-                            progress.update(current_task, visible=False)
-                            progress.stop()
-                            should_rescrape = typer.confirm(f"Recent snapshot found for {url_to_process} ({timestamp}). Rescrape?", default=False)
-                            progress.start()
-                            
-                            if not should_rescrape:
-                                snapshot = content
-                                log_event(session_id, "cli", "INFO", f"Using cached snapshot for {url_to_process}")
-
-                    selected_by_feature = {}
-                    if not snapshot:
-                        crawl_limit = limit if smart else 1
-
-                        def update_crawl_progress(completed, total):
-                            progress.update(current_task, completed=completed, total=total)
-                        
-                        def update_crawl_status(msg):
-                            progress.update(current_task, description=msg)
-
-                        if engine == "firecrawl":
-                            firecrawl_api_key = os.getenv("FIRECRAWL_API_KEY")
-                            if not firecrawl_api_key:
-                                raise Exception("FIRECRAWL_API_KEY environment variable not set.")
-
-                            progress.update(current_task, description=f"Fetching sitemap for {url_to_process}...", total=None)
-                            sitemap_urls = fetch_firecrawl_map_urls(
-                                url_to_process,
-                                firecrawl_api_key,
-                                limit=5000,
-                                include_subdomains=False,
-                                sitemap_mode="include",
-                            )
-                            if not sitemap_urls:
-                                sitemap_urls = fetch_sitemap_urls(url_to_process)
-
-                            feature_page_limit = limit
-                            selection = extractor.select_top_pages_for_features(
-                                url_to_process,
-                                sitemap_urls,
-                                feature_page_limit,
-                                status_callback=update_crawl_status,
-                            )
-                            selected_urls = selection.get("all", [])
-                            selected_by_feature = selection.get("by_feature", {})
-
-                            cached_results = []
-                            urls_to_scrape = []
-                            for page_url in selected_urls:
-                                if page_url in session_page_cache:
-                                    cached_results.append(
-                                        (page_url, session_page_cache[page_url])
-                                    )
-                                else:
-                                    urls_to_scrape.append(page_url)
-
-                            progress.update(
-                                current_task,
-                                description=f"Scraping {len(urls_to_scrape)} selected page{'s' if len(urls_to_scrape) != 1 else ''}...",
-                                visible=True,
-                                total=len(urls_to_scrape) if urls_to_scrape else None,
-                            )
-
-                            crawl_results = []
-                            if urls_to_scrape:
-                                crawl_results = scrape_firecrawl_urls(
-                                    urls_to_scrape,
-                                    firecrawl_api_key,
-                                    session_id=session_id,
-                                    status_callback=update_crawl_status,
-                                    progress_callback=update_crawl_progress,
-                                )
-                            if cached_results:
-                                crawl_results = cached_results + crawl_results
-                            for page_url, content in crawl_results:
-                                session_page_cache[page_url] = content
+                    def update_workflow_status(msg):
+                        if msg.startswith("✓"):
+                            progress.console.print(f"  [green]{msg}[/green]")
                         else:
-                            progress.update(
-                                current_task,
-                                description=f"Snapshotting {url_to_process} (engine: {engine}, limit: {crawl_limit})...",
-                                visible=True,
-                                total=crawl_limit if crawl_limit > 1 else None,
-                            )
-
-                            # crawl_domain returns list of (url, content)
-                            crawl_results = crawl_domain(
-                                url_to_process,
-                                engine=engine,
-                                limit=crawl_limit,
-                                session_id=session_id,
-                                status_callback=update_crawl_status,
-                                progress_callback=update_crawl_progress,
-                            )
-                        
-                        if not crawl_results:
-                            raise Exception("No content retrieved.")
+                            progress.update(current_task, description=msg)
                     
-                        progress.console.print(f"  [green]✓[/green] Snapshot captured ({len(crawl_results)} page{'s' if len(crawl_results)>1 else ''})")
-                        
-                        # Display scraped URLs
-                        if len(crawl_results) > 1:
-                            from rich.tree import Tree
-                            tree = Tree(f"[dim]Scraped paths for {url_to_process}:[/dim]")
-                            for r_url, _ in crawl_results:
-                                tree.add(f"[dim]{r_url}[/dim]")
-                            progress.console.print(tree)
-                    else:
-                        # Using cached snapshot
-                        progress.console.print(f"  [green]✓[/green] Using cached snapshot")
+                    # Run the LangGraph workflow
+                    final_state = run_htmlminer_workflow(
+                        url=url_to_process,
+                        features=extraction_config or [],
+                        api_key=api_key,
+                        firecrawl_api_key=firecrawl_api_key,
+                        engine=engine,
+                        smart_mode=smart,
+                        limit=limit,
+                        model_tier=gemini_tier,
+                        max_paragraphs=max_paragraphs,
+                        session_id=session_id,
+                        status_callback=update_workflow_status,
+                        use_langextract=langextract,
+                        synthesis_top=synthesis_top,
+                    )
                     
-                    if not sitemap_urls:
-                        progress.update(current_task, description=f"Fetching sitemap for {url_to_process}...", total=None)
-                        firecrawl_api_key = os.getenv("FIRECRAWL_API_KEY")
-                        if engine == "firecrawl" and firecrawl_api_key:
-                            sitemap_urls = fetch_firecrawl_map_urls(
-                                url_to_process,
-                                firecrawl_api_key,
-                                limit=5000,
-                                include_subdomains=False,
-                                sitemap_mode="include",
-                            )
-                        if not sitemap_urls:
-                            sitemap_urls = fetch_sitemap_urls(url_to_process)
-
-                    scraped_urls = [page_url for page_url, _ in crawl_results] if crawl_results else [url_to_process]
-                    scraped_paths = []
-                    seen_paths = set()
-                    for scraped_url in scraped_urls:
-                        parsed = urlparse(scraped_url)
-                        path = parsed.path or "/"
-                        if parsed.query:
-                            path = f"{path}?{parsed.query}"
-                        if path not in seen_paths:
-                            scraped_paths.append(path)
-                            seen_paths.add(path)
-
-                    site_context = {
-                        "sitemap_urls": sitemap_urls,
-                        "scraped_paths": scraped_paths,
-                        "scraped_urls": scraped_urls,
-                        "selected_urls_by_feature": selected_by_feature if engine == "firecrawl" else {},
-                        "max_items": 50,
-                    }
-
-                    progress.update(current_task, description=f"Extracting insights from {url_to_process}...", total=None) 
+                    # Extract results from final state
+                    extraction = final_state.get("results", {"URL": url_to_process})
+                    page_extractions = final_state.get("page_extractions")
+                    if page_extractions is not None:
+                        # Preserve LangExtract snippets grouped by feature, then page.
+                        extraction = dict(extraction)
+                        by_feature = {}
+                        for page_url, feature_map in page_extractions.items():
+                            for feature_name, snippets in feature_map.items():
+                                feature_bucket = by_feature.setdefault(feature_name, {})
+                                feature_bucket[page_url] = list(snippets)
+                        extraction["Raw_Extraction_By_Page"] = by_feature
+                    sitemap_urls = final_state.get("sitemap_urls", [])
+                    url_relevance_scores = final_state.get("relevance_scores", {})
                     
-                    def update_extract_status(msg):
-                        progress.update(current_task, description=msg)
+                    # Track relevance scores for metadata
+                    if url_relevance_scores:
+                        relevance_scores_by_url[url_to_process] = url_relevance_scores
                     
-                    # Extraction
-                    if crawl_results:
-                        extraction = extractor.extract_from_pages(
-                            crawl_results,
-                            url_to_process,
-                            max_paragraphs=max_paragraphs,
-                            status_callback=update_extract_status,
-                            site_context=site_context,
-                        )
-                    else:
-                        extraction = extractor.extract(
-                            snapshot,
-                            url_to_process,
-                            max_paragraphs=max_paragraphs,
-                            status_callback=update_extract_status,
-                            site_context=site_context,
-                        )
                     results.append(extraction)
-                    sitemap_by_url[url_to_process] = list(sitemap_urls)
+                    sitemap_by_url[url_to_process] = sitemap_urls
+                    
+                    # Display summary
+                    scraped_count = len(final_state.get("scraped_pages", []))
+                    progress.console.print(f"  [green]✓[/green] Workflow complete ({scraped_count} pages processed)")
                 
                 progress.remove_task(current_task)
                 progress.advance(overall_task)
@@ -654,6 +528,7 @@ def process(
         "timestamp": datetime.now().isoformat(),
         "session_id": session_id,
         "sitemaps": sitemap_by_url,
+        "relevance_scores": relevance_scores_by_url,
         "parameters": {
             "engine": engine,
             "smart": smart,
@@ -662,7 +537,8 @@ def process(
             "gemini_tier": gemini_tier if not agent else None,
             "agent_mode": agent,
             "spark_model": spark_model if agent else None,
-            "llm_timeout": llm_timeout,
+            "llm_timeout": effective_llm_timeout,
+            "step_timeout": STEP_TIMEOUT_S,
         },
         "urls_processed": len(urls),
         "results_count": len(results),
@@ -678,22 +554,45 @@ def process(
 
     display_results(results)
     
-    # Token Usage stats (only for standard extraction mode)
-    if not agent and hasattr(extractor, 'get_token_usage'):
-        stats = extractor.get_token_usage()
-        if stats['total_tokens'] > 0:
-            table = Table(title="Token Usage", box=box.ROUNDED)
-            table.add_column("Type", style="cyan")
-            table.add_column("Count", style="magenta")
-            
-            table.add_row("Prompt Tokens", f"{stats['prompt_tokens']:,}")
-            table.add_row("Completion Tokens", f"{stats['completion_tokens']:,}")
-            table.add_row("Total Tokens", f"{stats['total_tokens']:,}")
-            
-            console.print(table)
-        log_event(session_id, "cli", "INFO", "Completed process command", {"results_count": len(results), "token_usage": stats})
+    if not agent:
+        token_report = get_token_usage_report(session_id)
+        if token_report.get("steps"):
+            token_table = Table(title="Token Usage Report", box=box.SIMPLE)
+            token_table.add_column("Step", style="cyan")
+            token_table.add_column("Calls", justify="right")
+            token_table.add_column("Prompt", justify="right")
+            token_table.add_column("Completion", justify="right")
+            token_table.add_column("Total", justify="right")
+            token_table.add_column("Duration (s)", justify="right")
+
+            for step in token_report["steps"]:
+                token_table.add_row(
+                    step["step_name"],
+                    f"{step['calls']:,}",
+                    f"{step['prompt_tokens']:,}",
+                    f"{step['completion_tokens']:,}",
+                    f"{step['total_tokens']:,}",
+                    f"{step['duration_seconds']:.2f}",
+                )
+
+            totals = token_report["totals"]
+            token_table.add_row(
+                "TOTAL",
+                f"{totals['calls']:,}",
+                f"{totals['prompt_tokens']:,}",
+                f"{totals['completion_tokens']:,}",
+                f"{totals['total_tokens']:,}",
+                f"{totals['duration_seconds']:.2f}",
+                style="bold",
+            )
+
+            console.print(token_table)
+            console.print("[dim]Token usage details saved to logs/htmlminer_logs.db (step_timings table)[/dim]")
+        else:
+            console.print("[dim]No token usage data recorded for this session.[/dim]")
     else:
-        log_event(session_id, "cli", "INFO", "Completed process command", {"results_count": len(results)})
+        console.print("[dim]Token usage report not available in agent mode.[/dim]")
+    log_event(session_id, "cli", "INFO", "Completed process command", {"results_count": len(results)})
 
 if __name__ == "__main__":
     app()

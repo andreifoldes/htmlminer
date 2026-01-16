@@ -1,98 +1,62 @@
 {
     "metadata": {
-        "timestamp": "2026-01-16T11:06:01.845361",
-        "session_id": "20fe5053-3f22-43b6-973e-ea7e8c55e31b",
+        "timestamp": "2026-01-16T13:43:25.510503",
+        "session_id": "09e3e05e-24b6-4b0c-9229-be31c6e55606",
+        "sitemaps": {
+            "https://example.com": [
+                "https://example.com/",
+                "https://www.example.com",
+                "https://www.example.com/",
+                "https://example.com",
+                "https://example.com//"
+            ]
+        },
+        "relevance_scores": {
+            "https://example.com": {
+                "https://example.com/": {
+                    "overall": 9,
+                    "Risk": 7,
+                    "Goal": 9,
+                    "Method": 8
+                }
+            }
+        },
         "parameters": {
             "engine": "firecrawl",
             "smart": true,
-            "limit": 10,
+            "limit": 1,
             "max_paragraphs": 3,
             "gemini_tier": "cheap",
             "agent_mode": false,
-            "spark_model": null
+            "spark_model": null,
+            "llm_timeout": 600,
+            "step_timeout": 600
         },
         "urls_processed": 1,
         "results_count": 1
     },
     "results": [
         {
-            "URL": "https://deepmind.google/",
-            "Raw_Extractions": 36,
-            "Risk": "Not mentioned.",
-            "Risk_Raw": [],
-            "Risk_Count": 0,
-            "Goal": "The core feature is the significant impact and future potential of AI, exemplified by AlphaFold 2's breakthrough in protein structure prediction. This includes a vision for achieving AGI by solving fundamental scientific problems, enhancing AI safety, accelerating innovation for national prosperity and security, empowering creators, and building with next-generation AI systems.",
-            "Goal_Raw": [
-                {
-                    "text": "designed to empower filmmakers and storytellers",
-                    "source": "https://deepmind.google/"
+            "URL": "https://example.com",
+            "Counts": {
+                "Risk": 0,
+                "Goal": 0,
+                "Method": 0
+            },
+            "Risk": "Not mentioned",
+            "Goal": "Not mentioned",
+            "Method": "Not mentioned",
+            "Raw_Extraction_By_Page": {
+                "Risk": {
+                    "https://example.com/": []
                 },
-                {
-                    "text": "Build with our next generation AI systems",
-                    "source": "https://deepmind.google/"
+                "Goal": {
+                    "https://example.com/": []
                 },
-                {
-                    "text": "helping the AI safety community deepen understanding of complex language model behavior",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "a national mission to accelerate innovation and scientific discovery",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "to support prosperity and security in the AI era",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "Demis shares his vision for the path to AGI - from solving \"root node\" problems in fusion energy and material science to the rise of world models and simulations.",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "Five years ago, AlphaFold 2 solved the protein structure prediction problem, unlocking new avenues of biological research and providing our first major proof point that AI can be a powerful tool to advance science and cure disease.",
-                    "source": "https://deepmind.google/"
+                "Method": {
+                    "https://example.com/": []
                 }
-            ],
-            "Goal_Count": 7,
-            "Method": "The provided context outlines Shane's AGI framework, which categorizes levels of AGI from minimal to full, along with associated timelines. It also highlights the FACTS Benchmark Suite, a systematic method designed for evaluating the factuality of large language models. Additionally, it notes that AlphaFold 2 successfully solved the protein structure prediction problem, representing a significant methodological advance in biology.",
-            "Method_Raw": [
-                {
-                    "text": "Our latest video generation model",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "Our most intelligent AI models",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "Try it in Gemini app",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "Try it in Google AI Studio",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "Google DeepMind supports U.S. Department of Energy on Genesis",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "Strengthening our partnership with the UK government",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "FACTS Benchmark Suite: Systematically evaluating the factuality of large language models",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "Shane walks host Hannah Fry through his AGI framework, breaking down the levels from minimal AGI to full AGI, and his timelines for each.",
-                    "source": "https://deepmind.google/"
-                },
-                {
-                    "text": "AlphaFold 2 solved the protein structure prediction problem",
-                    "source": "https://deepmind.google/"
-                }
-            ],
-            "Method_Count": 9
+            }
         }
     ]
 }

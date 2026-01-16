@@ -35,6 +35,7 @@ class FirecrawlAgentExtractor:
         api_key: str,
         spark_model: str = "mini",
         session_id: Optional[str] = None,
+        step_timeout_s: Optional[int] = None,
     ):
         if spark_model not in SPARK_MODELS:
             raise ValueError(
@@ -45,6 +46,7 @@ class FirecrawlAgentExtractor:
         self.spark_model = spark_model
         self.model_id = SPARK_MODELS[spark_model]
         self.session_id = session_id
+        self.step_timeout_s = step_timeout_s if step_timeout_s and step_timeout_s > 0 else None
         
         self.app = FirecrawlApp(api_key=api_key)
 
@@ -147,6 +149,7 @@ Be thorough and look for this information across the entire website, including a
                 schema=schema,
                 model=self.model_id,
                 urls=[url],
+                timeout=self.step_timeout_s,
             )
             
             if status_callback:

@@ -46,7 +46,7 @@ def save_summary_csv(results: List[Dict], output_file: str):
         return
 
     # Extract feature names (excluding special fields)
-    known_fields = {"URL", "Raw_Extractions"}
+    known_fields = {"URL", "Raw_Extraction_By_Page"}
     feature_names = []
     for res in results:
         for k in res.keys():
@@ -91,7 +91,7 @@ def display_results(results: List[Dict]):
 
     # Dynamic columns
     # We'll take the keys from the first result, excluding known fixed fields
-    known_fields = {"URL", "Raw_Extractions"}
+    known_fields = {"URL", "Raw_Extraction_By_Page", "Counts"}
 
     # Gather all potential keys from all results to be safe, or just first one
     all_keys = []
@@ -113,16 +113,28 @@ def display_results(results: List[Dict]):
 
         for key in all_keys:
             val = res.get(key, "-")
+            # Ensure val is a string
+            if not isinstance(val, str):
+                val = str(val) if val is not None else "-"
             # Truncate for display
             display_val = (val[:200] + "...") if len(val) > 200 else val
             row_values.append(display_val)
 
-        # Build counts string
+        # Build counts string - handle both old format (_Count fields) and new format (Counts dict)
+        counts_dict = res.get("Counts", {})
         counts = []
-        for key in all_keys:
-             count = res.get(f"{key}_Count", 0)
-             if count > 0:
-                 counts.append(f"{key}: {count}")
+        
+        if isinstance(counts_dict, dict):
+            # New graph workflow format: Counts is a dict
+            for feature, count in counts_dict.items():
+                if count and count > 0:
+                    counts.append(f"{feature}: {count}")
+        else:
+            # Old format: individual _Count fields
+            for key in all_keys:
+                count = res.get(f"{key}_Count", 0)
+                if count > 0:
+                    counts.append(f"{key}: {count}")
 
         counts_str = ", ".join(counts) if counts else "0"
         row_values.append(counts_str)

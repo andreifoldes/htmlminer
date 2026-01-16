@@ -19,7 +19,8 @@ def crawl_domain(
     limit: int = 1, 
     session_id: str = None,
     status_callback: Optional[Callable[[str], None]] = None,
-    progress_callback: Optional[Callable[[int, int], None]] = None
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+    step_timeout_s: Optional[int] = None,
 ) -> list[tuple[str, str]]:
     """
     Crawls a domain and returns a list of (url, markdown_content) tuples.
@@ -34,6 +35,7 @@ def crawl_domain(
         progress_callback: Optional callback for progress updates (completed, total).
     """
     results = []
+    step_timeout_s = step_timeout_s if step_timeout_s and step_timeout_s > 0 else 600
     
     if engine == "firecrawl":
         api_key = os.getenv("FIRECRAWL_API_KEY")
@@ -49,7 +51,7 @@ def crawl_domain(
                 if status_callback:
                     status_callback(f"Scraping single page {url}...")
                     
-                scrape_result = app.scrape(url, formats=['markdown'])
+                scrape_result = app.scrape(url, formats=['markdown'], timeout=step_timeout_s)
                 if progress_callback:
                     progress_callback(1, 1)
 
@@ -89,8 +91,19 @@ def crawl_domain(
                     log_event(session_id, "crawler", "INFO", f"Crawl job started: {job_id}")
 
                 # Polling loop
+                poll_start = time.monotonic()
+                request_timeout_s = min(30, step_timeout_s)
                 while True:
-                    status = app.get_crawl_status(job_id)
+                    if step_timeout_s and (time.monotonic() - poll_start) > step_timeout_s:
+                        if hasattr(app, "cancel_crawl"):
+                            try:
+                                app.cancel_crawl(job_id)
+                            except Exception:
+                                pass
+                        raise TimeoutError(
+                            f"Crawl job {job_id} did not complete within {step_timeout_s} seconds"
+                        )
+                    status = app.get_crawl_status(job_id, request_timeout=request_timeout_s)
                     # status is likely a dict or object. 
                     
                     current_status = "unknown"
@@ -263,6 +276,7 @@ def scrape_firecrawl_urls(
     session_id: str = None,
     status_callback: Optional[Callable[[str], None]] = None,
     progress_callback: Optional[Callable[[int, int], None]] = None,
+    step_timeout_s: Optional[int] = None,
 ) -> list[tuple[str, str]]:
     """
     Scrapes a list of URLs with Firecrawl and returns (url, markdown) tuples.
@@ -273,12 +287,24 @@ def scrape_firecrawl_urls(
     app = FirecrawlApp(api_key=api_key)
     results: list[tuple[str, str]] = []
     total = len(urls)
+    step_timeout_s = step_timeout_s if step_timeout_s and step_timeout_s > 0 else 600
+    start_ts = time.monotonic()
 
     for idx, page_url in enumerate(urls, start=1):
+        if step_timeout_s and (time.monotonic() - start_ts) > step_timeout_s:
+            if session_id:
+                log_event(
+                    session_id,
+                    "crawler",
+                    "WARNING",
+                    f"Scrape step timed out after {step_timeout_s} seconds; stopping early",
+                    {"completed": idx - 1, "total": total},
+                )
+            break
         if status_callback:
             status_callback(f"Scraping {idx}/{total}: {page_url}")
         try:
-            scrape_result = app.scrape(page_url, formats=["markdown"])
+            scrape_result = app.scrape(page_url, formats=["markdown"], timeout=step_timeout_s)
             if progress_callback:
                 progress_callback(idx, total)
             content = None
