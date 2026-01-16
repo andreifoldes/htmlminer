@@ -74,6 +74,64 @@ HTMLMiner needs API keys to function. You have two options:
 - `GEMINI_API_KEY` - Required for all extraction modes. Get it from [Google AI Studio](https://aistudio.google.com/app/apikey)
 - `FIRECRAWL_API_KEY` - Required for `--agent` mode, optional but recommended for `--engine firecrawl`. Get it from [Firecrawl](https://firecrawl.dev/)
 
+## How it Works
+
+The following diagram illustrates the decision tree and logic flow used by HTMLMiner to extract features from websites:
+
+```mermaid
+graph TD
+    Start[Start: htmlminer process] --> CheckMode{Mode: --agent?}
+    
+    %% Firecrawl Agent Branch
+    CheckMode -- Yes --> FirecrawlAgent[Run Firecrawl Agent SDK]
+    FirecrawlAgent --> BuildSchema[Build Dynamic Schema from Config]
+    BuildSchema --> CallAgent[Call firecrawl.app.agent]
+    CallAgent --> Output[Save Results]
+
+    %% Standard Agentic Branch
+    CheckMode -- No --> CheckCache{Cache: Recent Snapshot?}
+    
+    CheckCache -- Yes --> ConfirmReuse{User Confirm?}
+    ConfirmReuse -- Yes --> Extraction
+    ConfirmReuse -- No --> CrawlStrategy
+    CheckCache -- No --> CrawlStrategy
+
+    %% Crawling Strategy
+    CrawlStrategy --> CheckEngine{Engine & Smart Mode?}
+    
+    CheckEngine -- "Firecrawl + Smart" --> FetchSitemap[Fetch Sitemap]
+    FetchSitemap --> FilterURLs[Filter Candidates (Domain/Ext)]
+    FilterURLs --> SelectPages{Select Pages}
+    
+    SelectPages -- "DSPy (LLM)" --> LLMSelect[LLM Selector via DSPy]
+    LLMSelect -- "Success" --> ScrapePages[Scrape Top N Pages]
+    LLMSelect -- "Fail" --> HeuristicSelect[Heuristic Limit Fallback]
+    HeuristicSelect --> ScrapePages
+    
+    CheckEngine -- "Trafilatura / Simple" --> SimpleCrawl[Crawl Domain (Limit N)]
+    SimpleCrawl --> ScrapePages
+    
+    %% Extraction Phase
+    ScrapePages --> Extraction[Agentic Extraction]
+    Extraction --> SizeCheck{Snapshot Size > 2MB?}
+    SizeCheck -- Yes --> Truncate[Truncate Content]
+    SizeCheck -- No --> RawExtract
+    Truncate --> RawExtract
+    
+    RawExtract --> LangExtract[LangExtract (Gemini)]
+    LangExtract --> FilterSnippets[Filter: < 5 words & Deduplicate]
+    FilterSnippets --> IterateFeatures[For Each Feature: Risk, Goal, Method]
+    
+    IterateFeatures --> Synthesis{Snippets Found?}
+    Synthesis -- Yes --> Top50[Select Top 50 Longest Snippets]
+    Top50 --> DSPySynth[DSPy Synthesis (FeatureSummarizer)]
+    DSPySynth --> ResultEntry
+    Synthesis -- No --> ResultEmpty["Not mentioned"]
+    
+    ResultEntry --> Output
+    ResultEmpty --> Output
+```
+
 ## Usage
 
 ### Batch Processing (File)
