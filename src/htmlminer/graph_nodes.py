@@ -6,6 +6,7 @@ Each node takes the workflow state and returns updates to it.
 """
 
 import time
+import datetime
 import json
 import re
 from typing import Optional
@@ -17,6 +18,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
 from rich.console import Console
+from rich.prompt import Confirm
 
 from .graph_state import HTMLMinerState, MODEL_TIERS
 from .graph_callbacks import StepTimingWrapper, TimingTokenCallback
@@ -26,12 +28,56 @@ from .crawler import (
     scrape_firecrawl_urls,
     crawl_domain,
 )
-from .database import log_event, save_page_relevance
+from .database import log_event, save_page_relevance, get_latest_snapshot
 
 console = Console()
 
 LANGEXTRACT_EXTRACTION_PASSES = 1
-LANGEXTRACT_MAX_CHAR_BUFFER = 50000
+LANGEXTRACT_MAX_CHAR_BUFFER = 5000  # Keep small (5KB) to prevent Gemini API hangs
+CACHE_TTL_SECONDS = 60 * 60
+
+
+def _parse_snapshot_timestamp(timestamp: str) -> Optional[datetime.datetime]:
+    if not timestamp:
+        return None
+    try:
+        return datetime.datetime.fromisoformat(timestamp)
+    except ValueError:
+        return None
+
+
+def _get_cached_snapshot(
+    page_url: str,
+    engine: str,
+    session_id: str,
+    status_callback: Optional[callable],
+) -> Optional[str]:
+    snapshot = get_latest_snapshot(page_url, engine)
+    if not snapshot:
+        return None
+    content, timestamp = snapshot
+    if not content:
+        return None
+    snapshot_time = _parse_snapshot_timestamp(timestamp)
+    if not snapshot_time:
+        return None
+    age_seconds = (datetime.datetime.now() - snapshot_time).total_seconds()
+    if age_seconds > CACHE_TTL_SECONDS:
+        return None
+    age_minutes = max(1, int(age_seconds // 60))
+    # Automatically use cache if within TTL, don't ask
+    # Default behavior is to use cache
+    if status_callback:
+        status_callback(f"Using cached snapshot for {page_url} ({age_minutes}m old).")
+    if session_id:
+        log_event(
+            session_id,
+            "graph",
+            "INFO",
+            "Using cached snapshot for page",
+            {"url": page_url, "age_minutes": age_minutes},
+        )
+    return content
 
 
 # =============================================================================
@@ -300,6 +346,8 @@ Select pages that are most likely to contain information about the features abov
     
     # Save relevance scores to database
     if relevance_scores and session_id:
+        if state.get("status_callback"):
+            state["status_callback"]("Saving page relevance scores...")
         save_page_relevance(session_id, url, relevance_scores)
     
     return {
@@ -338,40 +386,62 @@ def scrape_pages_node(state: HTMLMinerState) -> dict:
     engine = state.get("engine", "firecrawl")
     session_id = state.get("session_id", "")
     firecrawl_api_key = state.get("firecrawl_api_key")
+    actual_engine = "firecrawl" if engine == "firecrawl" and firecrawl_api_key else "trafilatura"
     
     # For simple mode, selected_pages might be empty - scrape the base URL
     if not selected_pages:
         selected_pages = [{"url": url, "relevance_score": 10}]
     
-    urls_to_scrape = [p["url"] for p in selected_pages]
+    cached_by_url: dict[str, str] = {}
+    urls_to_scrape: list[str] = []
     
     if state.get("status_callback"):
-        state["status_callback"](f"Scraping {len(urls_to_scrape)} pages...")
+         state["status_callback"](f"Checking cache for {len(selected_pages)} pages...")
+
+    for page in selected_pages:
+        page_url = page["url"]
+        cached_content = _get_cached_snapshot(
+            page_url,
+            actual_engine,
+            session_id,
+            state.get("status_callback"),
+        )
+        if cached_content is not None:
+            cached_by_url[page_url] = cached_content
+        else:
+            urls_to_scrape.append(page_url)
+    
+    if state.get("status_callback"):
+        if cached_by_url:
+            state["status_callback"](
+                f"Scraping {len(urls_to_scrape)} pages (using {len(cached_by_url)} cached)..."
+            )
+        else:
+            state["status_callback"](f"Scraping {len(urls_to_scrape)} pages...")
     
     with StepTimingWrapper("scrape_pages", session_id, url, status_callback=state.get("status_callback")) as timer:
         scraped = []
         
-        if engine == "firecrawl" and firecrawl_api_key:
-            # Use Firecrawl batch scraping
-            results = scrape_firecrawl_urls(
-                urls=urls_to_scrape,
-                api_key=firecrawl_api_key,
-                session_id=session_id,
-                status_callback=state.get("status_callback"),
-            )
-            for page_url, content in results:
-                score = next(
-                    (p["relevance_score"] for p in selected_pages if p["url"] == page_url),
-                    5
+        results_by_url: dict[str, str] = {}
+
+        if actual_engine == "firecrawl":
+            if urls_to_scrape:
+                # Use Firecrawl batch scraping
+                results = scrape_firecrawl_urls(
+                    urls=urls_to_scrape,
+                    api_key=firecrawl_api_key,
+                    session_id=session_id,
+                    status_callback=state.get("status_callback"),
                 )
-                scraped.append({
-                    "url": page_url,
-                    "content": content,
-                    "relevance_score": score,
-                })
+                for page_url, content in results:
+                    results_by_url[page_url] = content
         else:
             # Use trafilatura for each URL
             for page in selected_pages:
+                if page["url"] in cached_by_url:
+                    continue
+                if page["url"] not in urls_to_scrape:
+                    continue
                 try:
                     results = crawl_domain(
                         url=page["url"],
@@ -380,15 +450,26 @@ def scrape_pages_node(state: HTMLMinerState) -> dict:
                         session_id=session_id,
                     )
                     if results:
-                        scraped.append({
-                            "url": page["url"],
-                            "content": results[0][1],
-                            "relevance_score": page.get("relevance_score", 5),
-                        })
+                        results_by_url[page["url"]] = results[0][1]
                 except Exception as e:
                     log_event(session_id, "graph", "WARNING", f"Failed to scrape {page['url']}: {e}")
+
+        for page in selected_pages:
+            page_url = page["url"]
+            content = cached_by_url.get(page_url) or results_by_url.get(page_url)
+            if not content:
+                continue
+            scraped.append(
+                {
+                    "url": page_url,
+                    "content": content,
+                    "relevance_score": page.get("relevance_score", 5),
+                }
+            )
         
-        timer.set_details({"scraped_count": len(scraped)})
+        timer.set_details(
+            {"scraped_count": len(scraped), "cached_count": len(cached_by_url)}
+        )
     
     log_event(session_id, "graph", "INFO", f"Scraped {len(scraped)} pages")
     
@@ -451,6 +532,8 @@ def _create_feature_examples(feature_name: str, feature_desc: str) -> list:
     ]
 
 
+
+
 # =============================================================================
 # Node: Extract Features (per page, coarse mode)
 # =============================================================================
@@ -466,11 +549,14 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
     model_tier = state.get("model_tier", "cheap")
     session_id = state.get("session_id", "")
     url = state.get("url", "")
+    max_char_buffer = state.get("langextract_max_char_buffer", LANGEXTRACT_MAX_CHAR_BUFFER)
+    if not isinstance(max_char_buffer, int) or max_char_buffer <= 0:
+        max_char_buffer = LANGEXTRACT_MAX_CHAR_BUFFER
     
     if not scraped_pages or not features:
         return {"page_extractions": {}, "raw_counts": {}}
     
-    model_id = MODEL_TIERS.get(model_tier, MODEL_TIERS["cheap"])["model_id"]
+    model_id = MODEL_TIERS.get(model_tier, MODEL_TIERS["cheap"]).get("langextract_model_id", "gemini-2.0-flash")
     page_extractions = {}
     raw_counts = {f["name"]: 0 for f in features}
     
@@ -482,9 +568,6 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
             if not content or len(content.strip()) < 100:
                 continue
             
-            if state.get("status_callback"):
-                state["status_callback"](f"Extracting features from page {i+1}/{len(scraped_pages)}: {page_url[:50]}...")
-            
             page_extractions[page_url] = {}
             
             # Process each feature separately (sequential for now)
@@ -492,20 +575,27 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
                 feature_name = feature["name"]
                 feature_desc = feature["description"]
                 
+                if state.get("status_callback"):
+                    kb_size = len(content) / 1024
+                    state["status_callback"](f"Extracting '{feature_name}' from page {i+1}/{len(scraped_pages)} ({kb_size:.1f}KB)...")
+                
                 with StepTimingWrapper(f"extract_{feature_name}", session_id, page_url):
                     try:
                         # Create examples for this feature
                         feature_examples = _create_feature_examples(feature_name, feature_desc)
                         
-                        # Use LangExtract with correct API
+                        # Let langextract handle its own chunking internally
+                        # Use max_workers=1 to avoid parallel API calls that may cause rate limiting
                         annotated_doc = lx.extract(
-                            content,  # text_or_documents (positional)
+                            content,  # Pass full content, langextract handles chunking
                             prompt_description=feature_desc,
                             model_id=model_id,
                             api_key=api_key,
                             examples=feature_examples,
                             extraction_passes=LANGEXTRACT_EXTRACTION_PASSES,
-                            max_char_buffer=LANGEXTRACT_MAX_CHAR_BUFFER,
+                            max_char_buffer=max_char_buffer,
+                            max_workers=1,  # Serialize to avoid rate limiting
+                            debug=False,  # Disable langextract's internal progress bar
                         )
                         
                         # Extract snippets from AnnotatedDocument
@@ -513,7 +603,6 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
                             e.extraction_text for e in annotated_doc.extractions
                             if e.extraction_text and len(e.extraction_text.split()) >= 5
                         ]
-                        
                         # Deduplicate
                         snippets = list(dict.fromkeys(snippets))
                         
@@ -521,13 +610,10 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
                         raw_counts[feature_name] += len(snippets)
                         
                         # Estimate usage (approx 4 chars/token)
-                        # Input: Content + Prompt Description
-                        input_chars = len(content) + len(feature_desc)
-                        # Output: Snippets text
-                        output_chars = sum(len(s) for s in snippets)
-                        
-                        est_prompt_tokens = input_chars // 4
-                        est_completion_tokens = output_chars // 4
+                        total_input_chars = len(content) + len(feature_desc)
+                        total_output_chars = sum(len(s) for s in snippets)
+                        est_prompt_tokens = total_input_chars // 4
+                        est_completion_tokens = total_output_chars // 4
                         
                         # Aggregate for timer details
                         current_tokens = timer.details.get("tokens", {
@@ -688,15 +774,23 @@ def simple_crawl_node(state: HTMLMinerState) -> dict:
     limit = state.get("limit", 1)
     session_id = state.get("session_id", "")
     firecrawl_api_key = state.get("firecrawl_api_key")
+    actual_engine = "firecrawl" if engine == "firecrawl" and firecrawl_api_key else "trafilatura"
     
     if state.get("status_callback"):
         state["status_callback"](f"Crawling {url}...")
     
     with StepTimingWrapper("simple_crawl", session_id, url, status_callback=state.get("status_callback")) as timer:
-        if engine == "firecrawl" and firecrawl_api_key:
-            actual_engine = "firecrawl"
-        else:
-            actual_engine = "trafilatura"
+        if limit == 1:
+            cached_content = _get_cached_snapshot(
+                url,
+                actual_engine,
+                session_id,
+                state.get("status_callback"),
+            )
+            if cached_content is not None:
+                scraped = [{"url": url, "content": cached_content, "relevance_score": 10}]
+                timer.set_details({"scraped_count": len(scraped), "cached_count": 1})
+                return {"scraped_pages": scraped}
         
         results = crawl_domain(
             url=url,

@@ -44,6 +44,7 @@ class HTMLMinerState(TypedDict, total=False):
     model_tier: str  # 'cheap' or 'expensive'
     max_paragraphs: int  # Max paragraphs per feature in synthesis
     use_langextract: bool  # Whether to use langextract for intermediate extraction
+    langextract_max_char_buffer: int  # Max chars per chunk for LangExtract
     synthesis_top: int  # Max snippets per feature for synthesis
 
     
@@ -79,9 +80,12 @@ MODEL_TIERS = {
     "cheap": {
         "model_id": "gemini-2.5-flash",
         "langchain_model": "gemini-2.5-flash",
+        "langextract_model_id": "gemini-2.5-flash",
     },
     "expensive": {
         "model_id": "gemini-2.5-pro",
         "langchain_model": "gemini-2.5-pro",
+        "langextract_model_id": "gemini-2.5-pro",
     },
 }
+

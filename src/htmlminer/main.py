@@ -274,6 +274,7 @@ def process(
     agent: Annotated[bool, typer.Option(help="Use Firecrawl Agent SDK for extraction (requires FIRECRAWL_API_KEY).")] = False,
     spark_model: Annotated[str, typer.Option(help="Spark model for --agent mode: 'mini' (default) or 'pro'.")] = "mini",
     langextract: Annotated[bool, typer.Option(help="Enable LangExtract for intermediate extraction. If disabled (default), full page content is used for synthesis.")] = False,
+    langextract_max_char_buffer: Annotated[int, typer.Option(help="Max chars per chunk for LangExtract; smaller values prevent API hangs but increase API calls.")] = 5000,
 ):
     """
     Process URLs from a file, snapshot them, and extract AI risk information.
@@ -297,7 +298,7 @@ def process(
         "cli",
         "INFO",
         "Started process command",
-        {"file": file, "url": url, "engine": engine, "gemini_tier": gemini_tier, "smart": smart, "limit": limit, "agent": agent, "spark_model": spark_model, "synthesis_top": synthesis_top, "llm_timeout": effective_llm_timeout, "step_timeout": STEP_TIMEOUT_S},
+        {"file": file, "url": url, "engine": engine, "gemini_tier": gemini_tier, "smart": smart, "limit": limit, "agent": agent, "spark_model": spark_model, "synthesis_top": synthesis_top, "llm_timeout": effective_llm_timeout, "step_timeout": STEP_TIMEOUT_S, "langextract_max_char_buffer": langextract_max_char_buffer},
     )
 
     mode_label = "Firecrawl Agent" if agent else "Agentic Extraction"
@@ -348,6 +349,12 @@ def process(
     
     if llm_timeout < 0:
          msg = "--llm-timeout must be >= 0."
+         console.print(f"[bold red]Error:[/bold red] {msg}")
+         log_event(session_id, "cli", "ERROR", msg)
+         raise typer.Exit(code=1)
+    
+    if langextract_max_char_buffer < 1:
+         msg = "--langextract-max-char-buffer must be >= 1."
          console.print(f"[bold red]Error:[/bold red] {msg}")
          log_event(session_id, "cli", "ERROR", msg)
          raise typer.Exit(code=1)
@@ -469,24 +476,39 @@ def process(
                         if msg.startswith("✓"):
                             progress.console.print(f"  [green]{msg}[/green]")
                         else:
-                            progress.update(current_task, description=msg)
+                            progress.update(current_task, description=msg, refresh=True)
                     
-                    # Run the LangGraph workflow
-                    final_state = run_htmlminer_workflow(
-                        url=url_to_process,
-                        features=extraction_config or [],
-                        api_key=api_key,
-                        firecrawl_api_key=firecrawl_api_key,
-                        engine=engine,
-                        smart_mode=smart,
-                        limit=limit,
-                        model_tier=gemini_tier,
-                        max_paragraphs=max_paragraphs,
-                        session_id=session_id,
-                        status_callback=update_workflow_status,
-                        use_langextract=langextract,
-                        synthesis_top=synthesis_top,
-                    )
+                    # Run the LangGraph workflow with timeout
+                    import concurrent.futures
+                    
+                    # Define a function to run the workflow
+                    def _run_workflow():
+                        return run_htmlminer_workflow(
+                            url=url_to_process,
+                            features=extraction_config or [],
+                            api_key=api_key,
+                            firecrawl_api_key=firecrawl_api_key,
+                            engine=engine,
+                            smart_mode=smart,
+                            limit=limit,
+                            model_tier=gemini_tier,
+                            max_paragraphs=max_paragraphs,
+                            session_id=session_id,
+                            status_callback=update_workflow_status,
+                            use_langextract=langextract,
+                            langextract_max_char_buffer=langextract_max_char_buffer,
+                            synthesis_top=synthesis_top,
+                        )
+
+                    # Use ThreadPoolExecutor to enforce timeout
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                        future = executor.submit(_run_workflow)
+                        try:
+                            # Use step_timeout (10 mins) as the hard limit for the whole process per URL
+                            final_state = future.result(timeout=STEP_TIMEOUT_S)
+                        except concurrent.futures.TimeoutError:
+                            raise TimeoutError(f"Process timed out after {STEP_TIMEOUT_S} seconds")
+
                     
                     # Extract results from final state
                     extraction = final_state.get("results", {"URL": url_to_process})

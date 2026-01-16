@@ -79,22 +79,20 @@ def create_session() -> str:
     """
     return str(uuid.uuid4())
 
+
 def log_event(session_id: str, component: str, level: str, message: str, data: dict = None):
     """
     Logs an event to the database.
     """
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
         data_json = json.dumps(data) if data else None
-        
-        cursor.execute('''
-            INSERT INTO logs (session_id, component, level, message, data)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (session_id, component, level, message, data_json))
-        
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(DB_FILE, timeout=30.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO logs (session_id, component, level, message, data)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (session_id, component, level, message, data_json))
+            # conn.commit() is called automatically on successful exit
     except Exception as e:
         # Silently fail or simple print to avoid interrupting flow
         print(f"Log error: {e}")
@@ -118,17 +116,13 @@ def log_step_timing(
         details: Optional dict with additional info (feature name, counts, etc.)
     """
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
         details_json = json.dumps(details) if details else None
-        
-        cursor.execute('''
-            INSERT INTO step_timings (session_id, step_name, url, duration_seconds, details)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (session_id, step_name, url, duration_seconds, details_json))
-        
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(DB_FILE, timeout=30.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO step_timings (session_id, step_name, url, duration_seconds, details)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (session_id, step_name, url, duration_seconds, details_json))
     except Exception as e:
         print(f"Step timing log error: {e}")
 
@@ -138,14 +132,12 @@ def save_snapshot(url: str, engine: str, content: str):
     Saves a snapshot to the database.
     """
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO snapshots (url, engine, content)
-            VALUES (?, ?, ?)
-        ''', (url, engine, content))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(DB_FILE, timeout=30.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO snapshots (url, engine, content)
+                VALUES (?, ?, ?)
+            ''', (url, engine, content))
     except Exception as e:
         console.print(f"[red]Failed to save snapshot: {e}[/red]")
 
@@ -155,16 +147,15 @@ def get_latest_snapshot(url: str, engine: str):
     Returns tuple (content, timestamp) or None.
     """
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT content, timestamp FROM snapshots
-            WHERE url = ? AND engine = ?
-            ORDER BY timestamp DESC
-            LIMIT 1
-        ''', (url, engine))
-        row = cursor.fetchone()
-        conn.close()
+        with sqlite3.connect(DB_FILE, timeout=30.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT content, timestamp FROM snapshots
+                WHERE url = ? AND engine = ?
+                ORDER BY timestamp DESC
+                LIMIT 1
+            ''', (url, engine))
+            row = cursor.fetchone()
         return row
     except Exception as e:
         console.print(f"[red]Failed to get snapshot: {e}[/red]")
@@ -175,19 +166,17 @@ def save_extractions(extractions: list, session_id: str = None):
     Saves a list of extraction dictionaries to the database.
     """
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        
-        for extraction in extractions:
-            url = extraction.get("URL", "unknown")
-            data_json = json.dumps(extraction)
-            cursor.execute('''
-                INSERT INTO extractions (session_id, url, data)
-                VALUES (?, ?, ?)
-            ''', (session_id, url, data_json))
+        with sqlite3.connect(DB_FILE, timeout=30.0) as conn:
+            cursor = conn.cursor()
             
-        conn.commit()
-        conn.close()
+            for extraction in extractions:
+                url = extraction.get("URL", "unknown")
+                data_json = json.dumps(extraction)
+                cursor.execute('''
+                    INSERT INTO extractions (session_id, url, data)
+                    VALUES (?, ?, ?)
+                ''', (session_id, url, data_json))
+        
         console.print(f"[green]Saved {len(extractions)} extractions to {DB_FILE}[/green]")
     except Exception as e:
         console.print(f"[red]Failed to save extractions to DB: {e}[/red]")
@@ -210,20 +199,18 @@ def save_page_relevance(
         return
         
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        
-        for page_url, feature_scores in relevance_scores.items():
-            for feature, score in feature_scores.items():
-                cursor.execute('''
-                    INSERT INTO page_relevance (session_id, base_url, page_url, feature, relevance_score)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (session_id, base_url, page_url, feature, score))
-        
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(DB_FILE, timeout=30.0) as conn:
+            cursor = conn.cursor()
+            
+            for page_url, feature_scores in relevance_scores.items():
+                for feature, score in feature_scores.items():
+                    cursor.execute('''
+                        INSERT INTO page_relevance (session_id, base_url, page_url, feature, relevance_score)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (session_id, base_url, page_url, feature, score))
     except Exception as e:
         console.print(f"[red]Failed to save page relevance: {e}[/red]")
+
 
 
 def get_token_usage_report(session_id: str) -> dict:
