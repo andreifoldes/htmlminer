@@ -44,3 +44,13 @@ jobs:
 
       - name: Validate Firecrawl Results
         run: python scripts/validate_ci_results.py ci_results_firecrawl.json
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-test-results
+          path: |
+            ci_results.json
+            ci_results_firecrawl.json
+            *.csv
