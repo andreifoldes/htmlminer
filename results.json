@@ -1,7 +1,7 @@
 {
     "metadata": {
-        "timestamp": "2026-01-16T18:21:02.439963",
-        "session_id": "91dec0c3-5765-4bf1-8a46-7052ff580875",
+        "timestamp": "2026-01-16T18:28:09.594767",
+        "session_id": "038d2cd9-404a-4b67-b177-c112fdc92649",
         "sitemaps": {
             "https://anthropic.com/": [
                 "https://www.anthropic.com/research/anthropic-economic-index-january-2026-report",
@@ -416,13 +416,19 @@
                     "Risk": 10,
                     "Goal": 10,
                     "Method": 9
+                },
+                "https://www.anthropic.com/news/developing-nuclear-safeguards-for-ai-through-public-private-partnership": {
+                    "overall": 9,
+                    "Risk": 10,
+                    "Goal": 8,
+                    "Method": 9
                 }
             }
         },
         "parameters": {
             "engine": "firecrawl",
             "smart": true,
-            "limit": 1,
+            "limit": 2,
             "max_paragraphs": 3,
             "gemini_tier": "cheap",
             "agent_mode": false,
@@ -437,13 +443,13 @@
         {
             "URL": "https://anthropic.com/",
             "Counts": {
-                "Risk": 35,
-                "Goal": 40,
-                "Method": 29
+                "Risk": 34,
+                "Goal": 43,
+                "Method": 36
             },
-            "Risk": "The organization identifies the technical alignment problem as a primary risk, where AI systems, if significantly more competent than humans, could pursue goals conflicting with human interests, leading to dire or catastrophic outcomes. This includes both the strategic pursuit of dangerous goals and innocent mistakes in high-stakes situations, particularly as AI systems become intelligent enough to understand their place, deceive, or develop strategies beyond human comprehension. The difficulty in building safe, reliable, and steerable systems increases as AI approaches human-level intelligence and awareness. \n\nAdvanced AI systems pose risks through emergent dangerous behaviors such as toxicity, bias, unreliability, dishonesty, sycophancy, power-seeking, and deceptive alignment. These concerning behaviors may only arise when AI is very advanced, making detection and mitigation challenging. The potential for surprising capabilities to be used in problematic ways, or for AI to develop undesirable goals, represents a significant safety concern.\n\nRapid AI progress is also expected to cause significant societal disruption, impacting employment, macroeconomics, and global power structures. This disruption could trigger competitive races among corporations or nations to deploy untrustworthy AI systems, hindering careful development and potentially leading to further chaos. The research process itself carries risks, as efforts to ensure safety could inadvertently accelerate the deployment of dangerous technologies, necessitating careful management to mitigate these structural and societal harms.",
-            "Goal": "The organization's core goal is to ensure AI systems are safe, aligned with human values, and beneficial to society. This involves a comprehensive research program focused on developing AI that is helpful, honest, harmless, reliable, and robust. A central objective is to evaluate and understand AI alignment, assess the efficacy of alignment techniques, and determine their applicability to increasingly capable AI systems, while also anticipating and preventing dangerous failure modes.\n\nTo achieve this, the organization develops new algorithms for training AI, including methods to detect concerning behaviors such as power-seeking or deception. Key approaches include scaling human supervision into high-quality AI supervision, limiting AI training to process-oriented learning, and automating red-teaming to identify and mitigate unsafe aspects. The aim is to build safe, reliable, and steerable systems, training them up to and beyond human-level capabilities while maintaining safety.\n\nBeyond technical development, the organization seeks to provide policymakers and researchers with insights and tools to mitigate potential societal harms and ensure AI benefits are broadly distributed. This includes making externally verifiable commitments to develop advanced models only when safety standards are met, allowing independent evaluation, and integrating safety research into real systems to prevent the deployment of dangerous AIs.",
-            "Method": "Anthropic employs a multi-faceted approach to achieve its AI safety goals, primarily focusing on developing AI systems that are helpful, honest, harmless, reliable, robust, and aligned with human values. This involves creating new algorithms for training, utilizing techniques like Reinforcement Learning from Human Feedback (RLHF), and setting up controlled environments to isolate and study specific safety properties in smaller models. They also train AI systems to follow safe processes rather than just pursuing outcomes.\n\nTo ensure safety, the organization builds tools and measurements to evaluate AI capabilities, limitations, and societal impact. This includes improving understanding of how AI systems learn and generalize, studying generalization using influence functions, and reverse engineering neural networks to create transparent and interpretable AI. A key method is developing techniques to detect concerning behaviors such as power-seeking or deception in advanced AI systems.\n\nFurthermore, Anthropic conducts rigorous safety testing and mitigation. This involves red teaming language models to discover and reduce harms, automating adversarial training, and testing for dangerous failure modes. They also develop methods for scalable oversight and commit to only developing models beyond certain capability thresholds if safety standards are met, often allowing independent external organizations to evaluate both model capabilities and safety.",
+            "Risk": "The organization identifies significant risks associated with AI development, primarily centered on the technical alignment problem. This involves the potential for AI systems, especially those more competent than humans, to pursue goals that conflict with human interests, leading to dire or catastrophic consequences. These risks include AI making innocent mistakes in high-stakes situations or strategically pursuing dangerous objectives.\n\nFurther risks involve the emergence of concerning behaviors in advanced AI, such as deception, power-seeking, strategic planning abilities, toxicity, bias, unreliability, and dishonesty. Rapid AI progress is also anticipated to cause profound societal disruption, impacting employment, macroeconomics, and power structures globally. This disruption could trigger competitive races, potentially leading nations or corporations to deploy untrustworthy AI systems, and could also generate dangerous technical knowledge that threatens national security.\n\nOverall, the impact of AI is considered comparable to industrial and scientific revolutions, with an uncertain outcome. The research process itself carries risks, including the possibility of inadvertently accelerating the deployment of dangerous technologies or eliciting hazardous capacities within AI models.",
+            "Goal": "The organization's core goal is to develop AI systems that are helpful, honest, harmless, reliable, robust, and aligned with human values. This involves creating new algorithms and techniques for training safe and transparent systems, including those that may exceed human-level capabilities, and rapidly integrating the latest safety research into practical applications. A fundamental aim is to discover and disseminate safe methodologies for training powerful AI systems, thereby ensuring that the risks posed by advanced AI remain low.\n\nTo achieve these objectives, the organization focuses on rigorously evaluating and understanding AI alignment, assessing the efficacy of alignment techniques, and predicting their scalability. This encompasses developing methods to detect concerning behaviors such as power-seeking or deception, anticipating dangerous failure modes, and auditing models for safety. Efforts also include reverse engineering neural networks, automating adversarial training, and securing frontier AI models against misuse, such as nuclear proliferation risks.\n\nBeyond technical development, the organization aims to equip policymakers and researchers with the insights and tools necessary to mitigate potential societal harms and ensure the broad and equitable distribution of AI's benefits. This commitment extends to transparency, making externally legible commitments regarding safety standards, and facilitating independent evaluation of models. The overarching goal is to channel collective efforts towards AI safety research, warn against unsafe deployments, and build trustworthy AI systems for all users.",
+            "Method": "The organization employs a multi-faceted approach to ensure AI systems are helpful, honest, harmless, reliable, robust, and aligned with human values. This includes developing new algorithms and training these properties into small-scale models for isolated study. They utilize techniques like reinforcement learning from human feedback (RLHF) to guide AI systems towards safe processes and improve understanding of how AI systems learn and generalize, including detailed analysis of large language model training procedures and generalization using influence functions.\n\nKey methods involve comprehensive evaluation and understanding of AI capabilities, limitations, and potential societal impacts. They build tools and measurements to assess AI systems, research predictability in large language models, and work to reverse engineer neural networks for interpretability. To mitigate harms, the organization actively detects and prevents dangerous failure modes, develops techniques to identify concerning behaviors like power-seeking or deception, and employs red teaming (both manual and automated) to discover and reduce offensive outputs. They also trace model outputs back to training data and deploy classifiers on live traffic, such as on Claude.\n\nFurthermore, the organization is committed to responsible AI policies and governance. This involves making externally legible commitments to develop models beyond certain capability thresholds only if safety standards are met, and allowing independent, external organizations to evaluate both model capabilities and safety. They engage in public-private partnerships, such as with the U.S. Department of Energy's NNSA for developing nuclear safeguards for AI, and share their approaches with broader initiatives like the Frontier Model Forum.",
             "Raw_Extraction_By_Page": {
                 "Risk": {
                     "https://www.anthropic.com/news/core-views-on-ai-safety": [
@@ -466,22 +472,23 @@
                         "potential harms resulting from things like widespread automation and shifts in international power dynamics",
                         "structural risks posed by advanced AI",
                         "serious or catastrophic safety risks from advanced AI",
-                        "concerning behaviors such as [power-seeking](https://arxiv.org/pdf/2206.13353.pdf) or deception by advanced AI systems",
-                        "the risk posed by advanced AI is low",
-                        "if the alignment problem is actually nearly impossible, then we desperately need alignment science in order to build a very strong case for halting the development of advanced AI systems",
+                        "concerning behaviors such as power-seeking or deception by advanced AI systems",
+                        "risk posed by advanced AI",
+                        "if the alignment problem is actually nearly impossible, then we desperately need alignment science in order to build a very strong case for halting the development of advanced AI systems.",
                         "detecting undesirable behaviors from AI models",
-                        "whether a model is deceptively aligned (\u201cplaying along\u201d with even very hard tests, such as \"honeypot\" tests that deliberately \"tempt\" a system to reveal misalignment)",
+                        "warn others that the models are unsafe and should not be deployed",
+                        "whether a model is deceptively aligned",
+                        "auditing our models to either identify unsafe aspects",
                         "humans won't be able to provide the necessary feedback",
                         "harmful emergent behaviors, such as deception or strategic planning abilities",
                         "AI systems become deceptive, or develop surprising and undesirable goals",
                         "risks associated with the research itself",
-                        "eliciting the very capacities that we consider dangerous and carries obvious risks if performed on larger models with greater capabilities",
-                        "high-level predictability and unpredictability of these models can lead to harmful behaviors",
-                        "surprising capabilities might be used in problematic ways",
-                        "potentially harmful behavior in AI systems",
-                        "mitigate these potentially significant societal harms",
+                        "eliciting the very capacities that we consider dangerous",
                         "minimal risk of catastrophic failures",
                         "potential dangerous failure modes of AI"
+                    ],
+                    "https://www.anthropic.com/news/developing-nuclear-safeguards-for-ai-through-public-private-partnership": [
+                        "dangerous technical knowledge in ways that could threaten national security"
                     ]
                 },
                 "Goal": {
@@ -526,6 +533,11 @@
                         "evaluate and mitigate potentially harmful behavior in AI systems",
                         "predict how they might be used",
                         "provide policymakers and researchers with the insights and tools they need to help mitigate these potentially significant societal harms and ensure the benefits of AI are broadly and evenly distributed across society"
+                    ],
+                    "https://www.anthropic.com/news/developing-nuclear-safeguards-for-ai-through-public-private-partnership": [
+                        "build the tools needed to monitor for nuclear proliferation risks",
+                        "secure frontier AI models against nuclear misuse",
+                        "making AI models more reliable and trustworthy for all their users"
                     ]
                 },
                 "Method": {
@@ -548,17 +560,26 @@
                         "automate red-teaming (aka adversarial training)",
                         "red teaming via multi-agent RL",
                         "reverse engineers the computations performed by a neural network",
-                        "trace a model\u2019s outputs back to the training data",
+                        "trying to get a more detailed understanding of large language model (LLM) training procedures",
+                        "techniques to trace a model\u2019s outputs back to the training data",
                         "set up environments where we deliberately train these properties into small-scale models that are not capable enough to be dangerous, so that we can isolate and study them",
                         "building tools and measurements to evaluate and understand the capabilities, limitations, and potential for the societal impact of our AI systems",
-                        "red teaming language models to discover and reduce harms by probing models for offensive outputs across different model sizes",
-                        "conducting rigorous research on AI's implications today",
+                        "research analyzing predictability and surprise in large language models",
+                        "studied methods for red teaming language models to discover and reduce harms by probing models for offensive outputs across different model sizes",
+                        "found that current language models can follow instructions to reduce bias and stereotyping",
+                        "working on a variety of projects to evaluate and mitigate potentially harmful behavior in AI systems, to predict how they might be used, and to study their economic impact",
+                        "developing responsible AI policies and governance",
                         "improving our understanding of how AI systems learn and generalize to the real world",
                         "developing techniques for scalable oversight and review of AI systems",
                         "creating AI systems that are transparent and interpretable",
                         "training AI systems to follow safe processes instead of pursuing outcomes",
                         "analyzing potential dangerous failure modes of AI and how to prevent them",
                         "evaluating the societal impacts of AI to guide policy and research"
+                    ],
+                    "https://www.anthropic.com/news/developing-nuclear-safeguards-for-ai-through-public-private-partnership": [
+                        "partnered with the U.S. Department of Energy (DOE)\u2019s National Nuclear Security Administration (NNSA)",
+                        "deployed this classifier on Claude traffic",
+                        "share our approach with the Frontier Model Forum"
                     ]
                 }
             }
