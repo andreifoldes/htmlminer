@@ -4,6 +4,10 @@ import os
 import sys
 import platform
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
+import json
+import urllib.request
+import urllib.error
 from typing import Optional
 from typing_extensions import Annotated
 from rich.console import Console
@@ -23,11 +27,16 @@ from .firecrawl_agent import FirecrawlAgentExtractor, SPARK_MODELS
 from .storage import save_results, display_results, save_summary_csv
 
 from .database import init_db, create_session, log_event, save_extractions
+from . import __version__
 
 load_dotenv(find_dotenv())
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 console = Console()
+
+_GITHUB_API_BASE = "https://api.github.com/repos/andreifoldes/htmlminer"
+_VERSION_CACHE_PATH = Path("logs") / "version_check.json"
+_VERSION_CHECK_INTERVAL = timedelta(hours=24)
 
 def _check_windows_compatibility():
     """
@@ -46,6 +55,102 @@ def _check_windows_compatibility():
         except Exception as e:
             console.print(f"[red]Error: Cannot create logs directory on Windows: {e}[/red]")
             raise typer.Exit(code=1)
+
+def _parse_version(value: str) -> Optional[tuple[int, int, int]]:
+    cleaned = value.strip().lstrip("vV")
+    parts = cleaned.split(".")
+    if len(parts) < 2:
+        return None
+    numbers = []
+    for part in parts[:3]:
+        if not part.isdigit():
+            return None
+        numbers.append(int(part))
+    while len(numbers) < 3:
+        numbers.append(0)
+    return tuple(numbers)
+
+def _read_version_cache() -> Optional[dict]:
+    if not _VERSION_CACHE_PATH.exists():
+        return None
+    try:
+        return json.loads(_VERSION_CACHE_PATH.read_text())
+    except Exception:
+        return None
+
+def _write_version_cache(latest_version: str) -> None:
+    _VERSION_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "latest_version": latest_version,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _VERSION_CACHE_PATH.write_text(json.dumps(payload))
+
+def _fetch_latest_version() -> Optional[str]:
+    headers = {"User-Agent": "htmlminer-version-check"}
+    release_url = f"{_GITHUB_API_BASE}/releases/latest"
+    try:
+        req = urllib.request.Request(release_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=5) as response:
+            payload = json.load(response)
+            tag = payload.get("tag_name")
+            if isinstance(tag, str) and tag.strip():
+                return tag.strip()
+    except urllib.error.HTTPError as exc:
+        if exc.code not in {404, 403}:
+            return None
+    except Exception:
+        return None
+
+    tags_url = f"{_GITHUB_API_BASE}/tags?per_page=1"
+    try:
+        req = urllib.request.Request(tags_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=5) as response:
+            payload = json.load(response)
+            if isinstance(payload, list) and payload:
+                tag = payload[0].get("name")
+                if isinstance(tag, str) and tag.strip():
+                    return tag.strip()
+    except Exception:
+        return None
+    return None
+
+def _maybe_warn_if_outdated() -> None:
+    local_version = __version__
+    local_parsed = _parse_version(local_version)
+    if not local_parsed:
+        return
+
+    cached = _read_version_cache()
+    latest_version = None
+    if cached:
+        try:
+            checked_at = datetime.fromisoformat(cached.get("checked_at", ""))
+        except Exception:
+            checked_at = None
+        if checked_at and checked_at.tzinfo is None:
+            checked_at = checked_at.replace(tzinfo=timezone.utc)
+        if checked_at and datetime.now(timezone.utc) - checked_at < _VERSION_CHECK_INTERVAL:
+            latest_version = cached.get("latest_version")
+
+    if not latest_version:
+        latest_version = _fetch_latest_version()
+        if latest_version:
+            _write_version_cache(latest_version)
+
+    if not latest_version:
+        return
+
+    latest_parsed = _parse_version(latest_version)
+    if not latest_parsed:
+        return
+
+    if latest_parsed > local_parsed:
+        console.print(
+            f"[bold yellow]Update available:[/bold yellow] "
+            f"you are on v{local_version}, latest is {latest_version}. "
+            "Pull the latest changes from GitHub."
+        )
 
 def _prompt_for_api_key(key_name: str, description: str, url: str, required: bool = True) -> Optional[str]:
     """
@@ -138,10 +243,16 @@ def _prompt_for_api_key(key_name: str, description: str, url: str, required: boo
 
     return api_key
 
+@app.callback()
+def _main_callback(ctx: typer.Context):
+    if getattr(ctx, "resilient_parsing", False):
+        return
+    _maybe_warn_if_outdated()
+
 @app.command()
 def version():
     """Show the version of the application."""
-    console.print("htmlminer v0.1.0")
+    console.print(f"htmlminer v{__version__}")
     console.print(f"Platform: {platform.system()} {platform.release()}")
     console.print(f"Python: {sys.version.split()[0]}")
 
@@ -184,6 +295,7 @@ def process(
 
     mode_label = "Firecrawl Agent" if agent else "Agentic Extraction"
     console.print(Panel.fit(f"[bold cyan]HTMLMiner: {mode_label}[/bold cyan]", border_style="cyan"))
+    console.print(f"[dim]Session ID:[/dim] {session_id}")
 
     if not file and not url:
         msg = "At least one of --file or --url must be provided."
@@ -308,12 +420,14 @@ def process(
         
         overall_task = progress.add_task(f"[bold green]Processing {len(urls)} URLs...", total=len(urls))
 
+        sitemap_by_url = {}
         for url_to_process in urls:
             progress.update(overall_task, description=f"[bold]Processing {url_to_process}...")
             log_event(session_id, "cli", "INFO", f"Processing {url_to_process}")
             
             # Sub-task for current URL operations
             current_task = progress.add_task(f"Processing {url_to_process}...", total=None)
+            sitemap_urls = []
 
             try:
                 if agent:
@@ -329,6 +443,7 @@ def process(
                         status_callback=update_agent_status,
                     )
                     results.append(extraction)
+                    sitemap_by_url[url_to_process] = list(sitemap_urls)
                     progress.console.print(f"  [green]✓[/green] Agent extraction complete for {url_to_process}")
                 else:
                     # Standard mode: Crawl + Extract
@@ -358,7 +473,6 @@ def process(
                                 snapshot = content
                                 log_event(session_id, "cli", "INFO", f"Using cached snapshot for {url_to_process}")
 
-                    sitemap_urls = []
                     selected_by_feature = {}
                     if not snapshot:
                         crawl_limit = limit if smart else 1
@@ -516,6 +630,7 @@ def process(
                             site_context=site_context,
                         )
                     results.append(extraction)
+                    sitemap_by_url[url_to_process] = list(sitemap_urls)
                 
                 progress.remove_task(current_task)
                 progress.advance(overall_task)
@@ -530,6 +645,7 @@ def process(
     metadata = {
         "timestamp": datetime.now().isoformat(),
         "session_id": session_id,
+        "sitemaps": sitemap_by_url,
         "parameters": {
             "engine": engine,
             "smart": smart,

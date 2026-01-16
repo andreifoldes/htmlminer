@@ -5,22 +5,17 @@ Agentic web domain analyzer powered by Google Gemini and Firecrawl.
 ## Installation
 
 ### What is `uv`?
-`uv` is a fast Python package and project manager from Astral. **You only need to install `uv`** - it will automatically:
-- Download and install Python 3.10+ if not already available
-- Create and manage an isolated virtual environment
-- Install all dependencies specified in `pyproject.toml`
+`uv` is a fast Python package and project manager from Astral. It installs Python (if needed), creates an isolated environment, and manages dependencies so the CLI runs consistently across machines.
 
-This ensures the CLI runs consistently across machines without manual Python setup.
+### Install `uv`
+Pick one option, then confirm with `uv --version`.
 
-### Install `uv` (any OS)
-Pick one option for your OS, then confirm with `uv --version`.
-
-**macOS**
+**macOS (Homebrew)**
 ```bash
 brew install uv
 ```
 
-**Linux / macOS (installer script)**
+**Linux/macOS (installer script)**
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
@@ -35,29 +30,28 @@ irm https://astral.sh/uv/install.ps1 | iex
 winget install --id Astral.UV
 ```
 
+### Install HTMLMiner (recommended)
+Install the CLI directly from GitHub:
+```bash
+uv tool install git+https://github.com/andreifoldes/htmlminer.git
+```
+This makes the `htmlminer` command available globally.
+
+### Update HTMLMiner
+Pull the latest version with:
+```bash
+uv tool upgrade htmlminer
+```
+
+### Install for development
 From the project root (the folder that contains `pyproject.toml`), install HTMLMiner in editable mode:
 ```bash
 uv pip install -e .
 ```
 This creates a local virtual environment (if needed), installs dependencies, and links the package to your working copy so changes in `src/` are picked up immediately without reinstalling.
 
-### Windows Compatibility
-
-HTMLMiner is fully compatible with **Windows 10 and 11**. You only need to install `uv` - everything else is automatic!
-
-**What `uv` handles for you:**
-- ✅ **Python installation:** Automatically downloads Python 3.10+ if not already installed
-- ✅ **Virtual environment:** Creates and manages an isolated environment
-- ✅ **Dependencies:** Installs all required packages automatically
-- ✅ **Cross-platform paths:** All file operations work identically on Windows, Linux, and macOS
-- ✅ **Database storage:** SQLite database auto-created in `logs/` directory
-
-**Setup on Windows:**
-1. Install `uv` (PowerShell or winget)
-2. Restart your terminal (for PATH changes)
-3. Run `uv pip install -e .` in the project directory
-4. Create a `.env` file with your API keys (see `.env.template`) - **or let the CLI prompt you interactively**
-5. Done! No need to manually install Python or manage environments.
+### Platform notes
+HTMLMiner runs on Windows, macOS, and Linux. `uv` takes care of Python, virtual environments, and dependencies across platforms.
 
 ### API Key Setup
 
@@ -84,45 +78,45 @@ HTMLMiner needs API keys to function. You have two options:
 
 ### Batch Processing (File)
 ```bash
-uv run htmlminer process --file test_urls.md
+htmlminer process --file test_urls.md
 ```
 
 ### Single URL Processing
 ```bash
-uv run htmlminer process --url https://deepmind.google/about/
+htmlminer process --url https://deepmind.google/about/
 ```
 
 ### Using Firecrawl Engine
 ```bash
-uv run htmlminer process --url https://openai.com/safety/ --engine firecrawl
+htmlminer process --url https://openai.com/safety/ --engine firecrawl
 ```
 
 ### Controlling Summary Length
 Limit the max paragraphs per dimension (Risk, Goal, Method) in the final summary (default is 3):
 ```bash
-uv run htmlminer process --url https://anthropic.com/ --max-paragraphs 2
+htmlminer process --url https://anthropic.com/ --max-paragraphs 2
 ```
 
 ### Limiting Synthesis Context
 Cap the number of longest snippets per feature that are fed into synthesis (default is 50):
 ```bash
-uv run htmlminer process --url https://anthropic.com/ --synthesis-top 50
+htmlminer process --url https://anthropic.com/ --synthesis-top 50
 ```
 
 ### Choosing Gemini Model Tier
 Select a cheaper or more capable model for extraction and synthesis:
 ```bash
-uv run htmlminer process --url https://anthropic.com/ --gemini-tier expensive
+htmlminer process --url https://anthropic.com/ --gemini-tier expensive
 ```
 
 ### Agent Mode (Firecrawl Agent SDK)
 Use Firecrawl's Agent SDK for autonomous web research. This mode uses Spark 1 models to intelligently search and extract data without manual crawling:
 ```bash
 # Default: spark-1-mini (cost-efficient)
-uv run htmlminer process --url https://example.com --agent
+htmlminer process --url https://example.com --agent
 
 # For complex tasks: spark-1-pro (better accuracy)
-uv run htmlminer process --url https://example.com --agent --spark-model pro
+htmlminer process --url https://example.com --agent --spark-model pro
 ```
 
 > **Note:** Agent mode requires `FIRECRAWL_API_KEY` and uses Firecrawl's credit-based billing.

@@ -149,7 +149,7 @@ MODEL_TIERS = {
 }
 
 class AgenticExtractor:
-    LONG_PAGE_CHAR_THRESHOLD = 15000
+    LONG_PAGE_CHAR_THRESHOLD = 2000  # Lowered to capture more contentful pages for extraction
 
     def __init__(
         self,
@@ -595,6 +595,8 @@ class AgenticExtractor:
                     examples=examples,
                     model_id=self.model_id,
                     api_key=self.api_key,
+                    extraction_passes=1,
+                    max_char_buffer=60000,
                 )
                 
                 current_extractions = getattr(result, "extractions", [])
