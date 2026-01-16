@@ -15,35 +15,43 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        timeout-minutes: 5
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
+        timeout-minutes: 5
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version-file: "pyproject.toml"
+        timeout-minutes: 5
 
       - name: Install the project
         run: uv sync --all-extras --dev
+        timeout-minutes: 10
 
       - name: Run HTMLMiner test
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
         run: uv run htmlminer process --url https://anthropic.com/ --engine trafilatura --output ci_results.json
+        timeout-minutes: 20
 
       - name: Validate Trafilatura Results
         run: python scripts/validate_ci_results.py ci_results.json
+        timeout-minutes: 5
 
       - name: Run HTMLMiner test (Firecrawl)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
         run: uv run htmlminer process --url https://anthropic.com/ --engine firecrawl --output ci_results_firecrawl.json
+        timeout-minutes: 20
 
       - name: Validate Firecrawl Results
         run: python scripts/validate_ci_results.py ci_results_firecrawl.json
+        timeout-minutes: 5
 
       - name: Upload Test Results
         if: always()
@@ -54,3 +62,4 @@ jobs:
             ci_results.json
             ci_results_firecrawl.json
             *.csv
+        timeout-minutes: 5

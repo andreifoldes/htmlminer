@@ -118,7 +118,7 @@ graph TD
     SizeCheck -- No --> RawExtract
     Truncate --> RawExtract
     
-    RawExtract --> LangExtract[LangExtract (Gemini)]
+    RawExtract --> LangExtract["LangExtract (Gemini)"]
     LangExtract --> FilterSnippets["Filter: < 5 words & Deduplicate"]
     FilterSnippets --> IterateFeatures[For Each Feature: Risk, Goal, Method]
     
@@ -256,6 +256,7 @@ sqlite3 logs/htmlminer_logs.db "SELECT url, timestamp FROM snapshots ORDER BY ti
   --output TEXT           Path to output file [default: results.json]
   --engine TEXT           Engine to use: 'firecrawl' or 'trafilatura' [default: firecrawl]
   --max-paragraphs INT    Max paragraphs per dimension in agentic summary [default: 3]
+  --llm-timeout INT       Timeout in seconds for LLM requests (Gemini/DSpy) [default: 300]
   --gemini-tier TEXT      Gemini model tier: 'cheap' or 'expensive' [default: cheap]
   --smart                 Enable smart crawling to include sub-pages [default: True]
   --limit INT             Max pages per feature from sitemap when using --smart [default: 10]

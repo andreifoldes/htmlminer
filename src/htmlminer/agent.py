@@ -158,6 +158,7 @@ class AgenticExtractor:
         extraction_config: list = None,
         model_tier: str = "cheap",
         synthesis_top: int = 50,
+        llm_timeout_s: Optional[int] = None,
     ):
         self.api_key = api_key
         self.session_id = session_id
@@ -170,6 +171,8 @@ class AgenticExtractor:
         self.synthesis_top = synthesis_top
         self.model_id = MODEL_TIERS[model_tier]["model_id"]
         self.dspy_model = MODEL_TIERS[model_tier]["dspy_model"]
+        self.llm_timeout_s = llm_timeout_s if llm_timeout_s and llm_timeout_s > 0 else None
+        self.llm_timeout_ms = self.llm_timeout_s * 1000 if self.llm_timeout_s else None
         
         # Ensure the API key is set for google-generativeai / google-genai
         if api_key:
@@ -180,7 +183,10 @@ class AgenticExtractor:
 
         # Configure dspy
         try:
-             lm = dspy.LM(model=self.dspy_model, api_key=api_key)
+             dspy_kwargs = {}
+             if self.llm_timeout_s:
+                 dspy_kwargs["timeout"] = self.llm_timeout_s
+             lm = dspy.LM(model=self.dspy_model, api_key=api_key, **dspy_kwargs)
              dspy.settings.configure(lm=lm)
              self.dspy_lm = lm # Keep ref to track usage
         except Exception as e:
@@ -580,6 +586,9 @@ class AgenticExtractor:
         ]
 
         all_extractions = []
+        language_model_params = None
+        if self.llm_timeout_ms:
+            language_model_params = {"http_options": {"timeout": self.llm_timeout_ms}}
         
         for i, prompt in enumerate(prompts):
             try:
@@ -597,6 +606,7 @@ class AgenticExtractor:
                     api_key=self.api_key,
                     extraction_passes=1,
                     max_char_buffer=60000,
+                    language_model_params=language_model_params,
                 )
                 
                 current_extractions = getattr(result, "extractions", [])

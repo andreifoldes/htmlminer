@@ -265,6 +265,7 @@ def process(
     engine: Annotated[str, typer.Option(help="Engine to use: 'firecrawl' (default) or 'trafilatura'. For Firecrawl, set FIRECRAWL_API_KEY in .env for best results.")] = "firecrawl",
     max_paragraphs: Annotated[int, typer.Option(help="Max paragraphs per dimension in agentic summary")] = 3,
     synthesis_top: Annotated[int, typer.Option(help="Max longest snippets per feature to send to synthesis")] = 50,
+    llm_timeout: Annotated[int, typer.Option(help="Timeout in seconds for LLM requests (Gemini/DSpy). Use 0 to disable.")] = 300,
     gemini_tier: Annotated[str, typer.Option(help="Gemini model tier: 'cheap' or 'expensive'.")] = "cheap",
     smart: Annotated[bool, typer.Option(help="Enable smart crawling to discover and analyze sub-pages (e.g. /about, /research).")] = True,
     limit: Annotated[int, typer.Option(help="Max pages per feature to select from the sitemap when using --smart. Default 10.")] = 10,
@@ -290,7 +291,7 @@ def process(
         "cli",
         "INFO",
         "Started process command",
-        {"file": file, "url": url, "engine": engine, "gemini_tier": gemini_tier, "smart": smart, "limit": limit, "agent": agent, "spark_model": spark_model, "synthesis_top": synthesis_top},
+        {"file": file, "url": url, "engine": engine, "gemini_tier": gemini_tier, "smart": smart, "limit": limit, "agent": agent, "spark_model": spark_model, "synthesis_top": synthesis_top, "llm_timeout": llm_timeout},
     )
 
     mode_label = "Firecrawl Agent" if agent else "Agentic Extraction"
@@ -335,6 +336,12 @@ def process(
 
     if synthesis_top < 1:
          msg = "--synthesis-top must be >= 1."
+         console.print(f"[bold red]Error:[/bold red] {msg}")
+         log_event(session_id, "cli", "ERROR", msg)
+         raise typer.Exit(code=1)
+    
+    if llm_timeout < 0:
+         msg = "--llm-timeout must be >= 0."
          console.print(f"[bold red]Error:[/bold red] {msg}")
          log_event(session_id, "cli", "ERROR", msg)
          raise typer.Exit(code=1)
@@ -404,6 +411,7 @@ def process(
             extraction_config=extraction_config,
             model_tier=gemini_tier,
             synthesis_top=synthesis_top,
+            llm_timeout_s=llm_timeout if llm_timeout > 0 else None,
         )
 
     from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
@@ -654,6 +662,7 @@ def process(
             "gemini_tier": gemini_tier if not agent else None,
             "agent_mode": agent,
             "spark_model": spark_model if agent else None,
+            "llm_timeout": llm_timeout,
         },
         "urls_processed": len(urls),
         "results_count": len(results),
