@@ -31,10 +31,16 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
-        run: uv run htmlminer process --url https://example.com --engine trafilatura --output ci_results.json
+        run: uv run htmlminer process --url https://anthropic.com/ --engine trafilatura --output ci_results.json
+
+      - name: Validate Trafilatura Results
+        run: python scripts/validate_ci_results.py ci_results.json
 
       - name: Run HTMLMiner test (Firecrawl)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
-        run: uv run htmlminer process --url https://example.com --engine firecrawl --output ci_results_firecrawl.json
+        run: uv run htmlminer process --url https://anthropic.com/ --engine firecrawl --output ci_results_firecrawl.json
+
+      - name: Validate Firecrawl Results
+        run: python scripts/validate_ci_results.py ci_results_firecrawl.json
