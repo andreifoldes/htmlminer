@@ -25,17 +25,22 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 irm https://astral.sh/uv/install.ps1 | iex
 ```
 
-**Windows (winget)**
-```powershell
-winget install --id Astral.UV
-```
-
 ### Install HTMLMiner (recommended)
 Install the CLI directly from GitHub:
 ```bash
 uv tool install git+https://github.com/andreifoldes/htmlminer.git
 ```
 This makes the `htmlminer` command available globally.
+
+> [!NOTE]
+> This method requires **Git** to be installed on your system.
+>
+> **Install Git:**
+> - **macOS:** `brew install git` or download from [git-scm.com](https://git-scm.com/download/mac)
+> - **Linux:** `sudo apt install git` (Debian/Ubuntu) or `sudo dnf install git` (Fedora)
+> - **Windows:** Download from [git-scm.com](https://git-scm.com/download/win)
+>
+> **Don't have Git?** You can install HTMLMiner without it by downloading from PyPI (once published) or by cloning the repo manually and using the development install method below.
 
 ### Update HTMLMiner
 Pull the latest version with:
