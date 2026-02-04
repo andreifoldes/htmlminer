@@ -2,6 +2,7 @@ import trafilatura
 import os
 from firecrawl import FirecrawlApp
 from rich.console import Console
+import requests
 
 from .database import log_event, save_snapshot
 
@@ -299,6 +300,43 @@ def fetch_firecrawl_map_urls(
         return []
 
 
+def _scrape_url_with_requests(page_url: str, api_key: str, timeout_s: int = 60) -> Optional[str]:
+    """
+    Scrape a single URL using direct requests to Firecrawl API (bypasses SDK).
+    Returns markdown content or None on failure.
+    """
+    try:
+        response = requests.post(
+            "https://api.firecrawl.dev/v2/scrape",
+            json={
+                "url": page_url,
+                "formats": ["markdown"],
+                "onlyMainContent": False,
+            },
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=timeout_s,
+        )
+        
+        if response.status_code != 200:
+            console.print(f"[red]Firecrawl API error ({response.status_code}):[/red] {response.text[:200]}")
+            return None
+            
+        data = response.json()
+        # Response structure: {"success": true, "data": {"markdown": "..."}}
+        if data.get("success") and data.get("data"):
+            return data["data"].get("markdown")
+        return None
+    except requests.exceptions.Timeout:
+        console.print(f"[red]Firecrawl request timeout for {page_url}[/red]")
+        return None
+    except Exception as e:
+        console.print(f"[red]Firecrawl request error for {page_url}:[/red] {e}")
+        return None
+
+
 def scrape_firecrawl_urls(
     urls: list[str],
     api_key: str,
@@ -306,15 +344,17 @@ def scrape_firecrawl_urls(
     status_callback: Optional[Callable[[str], None]] = None,
     progress_callback: Optional[Callable[[int, int], None]] = None,
     step_timeout_s: Optional[int] = None,
+    fallback_to_trafilatura: bool = True,
 ) -> list[tuple[str, str]]:
     """
-    Scrapes a list of URLs with Firecrawl and returns (url, markdown) tuples.
+    Scrapes a list of URLs with Firecrawl (using direct requests) and returns (url, markdown) tuples.
+    If fallback_to_trafilatura is True, failed URLs will be retried with trafilatura.
     """
     if not api_key:
         raise Exception("FCRAWL_API_KEY environment variable not set.")
 
-    app = FirecrawlApp(api_key=api_key)
     results: list[tuple[str, str]] = []
+    failed_urls: list[str] = []
     total = len(urls)
     step_timeout_s = step_timeout_s if step_timeout_s and step_timeout_s > 0 else 600
     start_ts = time.monotonic()
@@ -332,36 +372,55 @@ def scrape_firecrawl_urls(
             break
         if status_callback:
             status_callback(f"Scraping {idx}/{total}: {page_url}")
-        try:
-            # Firecrawl expects timeout in milliseconds (minimum 1000ms)
-            timeout_ms = step_timeout_s * 1000
-            scrape_result = app.scrape(page_url, formats=["markdown"], timeout=timeout_ms)
-            if progress_callback:
-                progress_callback(idx, total)
-            content = None
-            if scrape_result and hasattr(scrape_result, "markdown"):
-                content = scrape_result.markdown
-            elif isinstance(scrape_result, dict):
-                content = scrape_result.get("markdown")
-            if content:
-                save_snapshot(page_url, "firecrawl", content)
-                results.append((page_url, content))
-            else:
-                console.print(f"[yellow]Warning:[/yellow] Firecrawl returned empty content for {page_url}")
-        except Exception as exc:
-            console.print(f"[red]Firecrawl scrape failed for {page_url}:[/red] {exc}")
+        
+        # Use direct requests instead of SDK for better compatibility
+        content = _scrape_url_with_requests(page_url, api_key, timeout_s=min(60, step_timeout_s))
+        
+        if progress_callback:
+            progress_callback(idx, total)
+        
+        if content:
+            save_snapshot(page_url, "firecrawl", content)
+            results.append((page_url, content))
+        else:
+            failed_urls.append(page_url)
             if session_id:
                 log_event(
                     session_id,
                     "crawler",
-                    "ERROR",
+                    "WARNING",
                     f"Failed to scrape {page_url} with firecrawl",
-                    {"error": str(exc)},
                 )
-            continue
+
+    # Fallback to trafilatura for failed URLs
+    if failed_urls and fallback_to_trafilatura:
+        console.print(f"[cyan]Retrying {len(failed_urls)} failed URL(s) with trafilatura...[/cyan]")
+        for page_url in failed_urls:
+            if status_callback:
+                status_callback(f"Fallback scraping: {page_url}")
+            try:
+                downloaded = trafilatura.fetch_url(page_url)
+                if downloaded:
+                    content = trafilatura.extract(
+                        downloaded,
+                        include_links=True,
+                        include_images=False,
+                        include_tables=True,
+                        output_format="markdown",
+                    )
+                    if content:
+                        save_snapshot(page_url, "trafilatura", content)
+                        results.append((page_url, content))
+                        console.print(f"[green]✓[/green] Trafilatura fallback succeeded for {page_url}")
+                    else:
+                        console.print(f"[yellow]Warning:[/yellow] Trafilatura also returned empty for {page_url}")
+                else:
+                    console.print(f"[yellow]Warning:[/yellow] Trafilatura failed to fetch {page_url}")
+            except Exception as e:
+                console.print(f"[yellow]Warning:[/yellow] Trafilatura fallback failed for {page_url}: {e}")
 
     if not results and urls:
-        console.print(f"[yellow]Warning:[/yellow] Firecrawl returned no content for any of the {len(urls)} URLs")
+        console.print(f"[yellow]Warning:[/yellow] No content retrieved for any of the {len(urls)} URLs")
     
     return results
 
