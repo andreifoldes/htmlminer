@@ -50,12 +50,25 @@ def _check_windows_compatibility():
         if sys.version_info < (3, 10):
             console.print("[yellow]Warning: Python 3.10 or higher is recommended on Windows.[/yellow]")
 
+        # Warn if running from a system directory
+        cwd = os.getcwd().lower()
+        system_dirs = ["c:\\windows", "c:\\program files", "c:\\program files (x86)"]
+        if any(cwd.startswith(d) for d in system_dirs):
+            console.print(Panel(
+                "[bold red]Warning: Running from a system directory![/bold red]\n"
+                f"Current directory: {os.getcwd()}\n\n"
+                "This may cause permission issues. Please run htmlminer from a user directory like:\n"
+                "  C:\\Users\\YourName\\Documents",
+                border_style="red"
+            ))
+
         # Validate that the logs directory can be created
         try:
             logs_dir = "logs"
             os.makedirs(logs_dir, exist_ok=True)
         except Exception as e:
             console.print(f"[red]Error: Cannot create logs directory on Windows: {e}[/red]")
+            console.print("[yellow]Try running from a user directory like C:\\Users\\YourName\\Documents[/yellow]")
             raise typer.Exit(code=1)
 
 def _parse_version(value: str) -> Optional[tuple[int, int, int]]:
