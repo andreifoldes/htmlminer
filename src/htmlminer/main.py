@@ -258,8 +258,34 @@ def version():
     console.print(f"Platform: {platform.system()} {platform.release()}")
     console.print(f"Python: {sys.version.split()[0]}")
 
-@app.command()
+@app.command(name="reset-env")
+def reset_env(
+    force: Annotated[bool, typer.Option("--force", "-f", help="Skip confirmation prompt")] = False,
+):
+    """Reset the .env file by removing all saved API keys."""
+    env_file = Path(".env")
 
+    if not env_file.exists():
+        console.print(f"[yellow]No .env file found at {env_file.resolve()}[/yellow]")
+        return
+
+    if not force:
+        confirm = Confirm.ask(
+            f"[bold red]This will delete all saved API keys in {env_file.resolve()}.[/bold red] Continue?",
+            default=False
+        )
+        if not confirm:
+            console.print("[dim]Aborted.[/dim]")
+            return
+
+    try:
+        env_file.unlink()
+        console.print(f"[green]✓[/green] Deleted {env_file.resolve()}")
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] Failed to delete .env file: {e}")
+        raise typer.Exit(code=1)
+
+@app.command()
 def process(
     file: Annotated[Optional[str], typer.Option(help="Path to markdown file containing URLs")] = None,
     url: Annotated[Optional[str], typer.Option(help="Single URL to process")] = None,
