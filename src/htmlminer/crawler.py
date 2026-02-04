@@ -304,7 +304,9 @@ def scrape_firecrawl_urls(
         if status_callback:
             status_callback(f"Scraping {idx}/{total}: {page_url}")
         try:
-            scrape_result = app.scrape(page_url, formats=["markdown"], timeout=step_timeout_s)
+            # Firecrawl expects timeout in milliseconds (minimum 1000ms)
+            timeout_ms = step_timeout_s * 1000
+            scrape_result = app.scrape(page_url, formats=["markdown"], timeout=timeout_ms)
             if progress_callback:
                 progress_callback(idx, total)
             content = None
