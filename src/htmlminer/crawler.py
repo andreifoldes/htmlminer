@@ -38,9 +38,9 @@ def crawl_domain(
     step_timeout_s = step_timeout_s if step_timeout_s and step_timeout_s > 0 else 600
     
     if engine == "firecrawl":
-        api_key = os.getenv("FIRECRAWL_API_KEY")
+        api_key = os.getenv("FCRAWL_API_KEY")
         if not api_key:
-            raise Exception("FIRECRAWL_API_KEY environment variable not set.")
+            raise Exception("FCRAWL_API_KEY environment variable not set.")
             
         try:
             app = FirecrawlApp(api_key=api_key)
@@ -282,7 +282,7 @@ def scrape_firecrawl_urls(
     Scrapes a list of URLs with Firecrawl and returns (url, markdown) tuples.
     """
     if not api_key:
-        raise Exception("FIRECRAWL_API_KEY environment variable not set.")
+        raise Exception("FCRAWL_API_KEY environment variable not set.")
 
     app = FirecrawlApp(api_key=api_key)
     results: list[tuple[str, str]] = []

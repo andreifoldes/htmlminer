@@ -290,19 +290,19 @@ def process(
     file: Annotated[Optional[str], typer.Option(help="Path to markdown file containing URLs")] = None,
     url: Annotated[Optional[str], typer.Option(help="Single URL to process")] = None,
     output: Annotated[str, typer.Option(help="Path to output file (e.g. results.json or results.csv)")] = "results.json",
-    engine: Annotated[str, typer.Option(help="Engine to use: 'firecrawl' (default) or 'trafilatura'. For Firecrawl, set FIRECRAWL_API_KEY in .env for best results.")] = "firecrawl",
+    engine: Annotated[str, typer.Option(help="Engine to use: 'firecrawl' (default) or 'trafilatura'. For Firecrawl, set FCRAWL_API_KEY in .env for best results.")] = "firecrawl",
     max_paragraphs: Annotated[int, typer.Option(help="Max paragraphs per dimension in agentic summary")] = 3,
     synthesis_top: Annotated[int, typer.Option(help="Max longest snippets per feature to send to synthesis")] = 50,
     llm_timeout: Annotated[int, typer.Option(help="Timeout in seconds for LLM requests (Gemini/DSpy), capped at 600.")] = STEP_TIMEOUT_S,
     gemini_tier: Annotated[str, typer.Option(help="Gemini model tier: 'cheap' or 'expensive'.")] = "cheap",
     smart: Annotated[bool, typer.Option(help="Enable smart crawling to discover and analyze sub-pages (e.g. /about, /research).")] = True,
     limit: Annotated[int, typer.Option(help="Max pages per feature to select from the sitemap when using --smart. Default 10.")] = 10,
-    agent: Annotated[bool, typer.Option(help="Use Firecrawl Agent SDK for extraction (requires FIRECRAWL_API_KEY).")] = False,
+    agent: Annotated[bool, typer.Option(help="Use Firecrawl Agent SDK for extraction (requires FCRAWL_API_KEY).")] = False,
     spark_model: Annotated[str, typer.Option(help="Spark model for --agent mode: 'mini' (default) or 'pro'.")] = "mini",
     langextract: Annotated[bool, typer.Option(help="Enable LangExtract for intermediate extraction. If disabled (default), full page content is used for synthesis.")] = False,
     langextract_max_char_buffer: Annotated[int, typer.Option(help="Max chars per chunk for LangExtract; smaller values prevent API hangs but increase API calls.")] = 5000,
     gemini_api_key: Annotated[Optional[str], typer.Option(help="Gemini API key (overrides GEMINI_API_KEY env var)")] = None,
-    firecrawl_api_key: Annotated[Optional[str], typer.Option(help="Firecrawl API key (overrides FIRECRAWL_API_KEY env var)")] = None,
+    firecrawl_api_key: Annotated[Optional[str], typer.Option(help="Firecrawl API key (overrides FCRAWL_API_KEY env var)")] = None,
 ):
     """
     Process URLs from a file, snapshot them, and extract AI risk information.
@@ -398,10 +398,10 @@ def process(
 
         # Firecrawl API key is required for agent mode
         # Priority: CLI flag > env var > prompt
-        fc_api_key = firecrawl_api_key or os.getenv("FIRECRAWL_API_KEY")
+        fc_api_key = firecrawl_api_key or os.getenv("FCRAWL_API_KEY")
         if not fc_api_key:
             fc_api_key = _prompt_for_api_key(
-                key_name="FIRECRAWL_API_KEY",
+                key_name="FCRAWL_API_KEY",
                 description="Firecrawl API",
                 url="https://firecrawl.dev/",
                 required=True
@@ -410,15 +410,15 @@ def process(
     elif engine == "firecrawl":
         # Firecrawl API key is recommended but optional for non-agent crawling
         # Priority: CLI flag > env var > prompt
-        fc_api_key = firecrawl_api_key or os.getenv("FIRECRAWL_API_KEY")
+        fc_api_key = firecrawl_api_key or os.getenv("FCRAWL_API_KEY")
         if not fc_api_key:
             console.print(Panel(
-                "[yellow]Note: using 'firecrawl' without FIRECRAWL_API_KEY.[/yellow]\n"
+                "[yellow]Note: using 'firecrawl' without FCRAWL_API_KEY.[/yellow]\n"
                 "For best results, you can provide your Firecrawl API key.",
                 border_style="yellow"
             ))
             fc_api_key = _prompt_for_api_key(
-                key_name="FIRECRAWL_API_KEY",
+                key_name="FCRAWL_API_KEY",
                 description="Firecrawl API",
                 url="https://firecrawl.dev/",
                 required=False
