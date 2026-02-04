@@ -177,6 +177,16 @@ After a run, the CLI prints:
 - `description`: what the extractor should look for
 - `synthesis_topic`: how the summary for that dimension should be framed
 
+**Config file lookup order:**
+1. `--config /path/to/custom.json` - Use a specific config file
+2. `./config.json` - Use config.json in current directory (if exists)
+3. Built-in defaults - Risk, Goal, Method features
+
+**Using a custom config:**
+```bash
+htmlminer process --url https://example.com --config /path/to/my-config.json
+```
+
 Example configuration:
 ```json
 {
@@ -250,6 +260,7 @@ sqlite3 logs/htmlminer_logs.db "SELECT url, timestamp FROM snapshots ORDER BY ti
   --file TEXT             Path to markdown file containing URLs
   --url TEXT              Single URL to process
   --output TEXT           Path to output file [default: results.json]
+  --config TEXT           Path to config.json with feature definitions [default: ./config.json or built-in defaults]
   --engine TEXT           Engine to use: 'firecrawl' or 'trafilatura' [default: firecrawl]
   --max-paragraphs INT    Max paragraphs per dimension in agentic summary [default: 3]
   --llm-timeout INT       Timeout in seconds for LLM requests (Gemini/DSpy), capped at 600 [default: 600]

@@ -33,7 +33,7 @@ from .database import log_event, save_page_relevance, get_latest_snapshot
 console = Console()
 
 LANGEXTRACT_EXTRACTION_PASSES = 1
-LANGEXTRACT_MAX_CHAR_BUFFER = 5000  # Keep small (5KB) to prevent Gemini API hangs
+LANGEXTRACT_MAX_CHAR_BUFFER = 50000  # 50KB - larger buffer = fewer API calls = faster extraction
 CACHE_TTL_SECONDS = 60 * 60
 
 
@@ -610,7 +610,8 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
                             extraction_passes=LANGEXTRACT_EXTRACTION_PASSES,
                             max_char_buffer=max_char_buffer,
                             max_workers=1,  # Serialize to avoid rate limiting
-                            debug=False,  # Disable langextract's internal progress bar
+                            debug=False,
+                            show_progress=False,  # Disable progress bar output
                         )
                         
                         # Extract snippets from AnnotatedDocument
