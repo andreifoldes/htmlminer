@@ -275,6 +275,8 @@ def process(
     spark_model: Annotated[str, typer.Option(help="Spark model for --agent mode: 'mini' (default) or 'pro'.")] = "mini",
     langextract: Annotated[bool, typer.Option(help="Enable LangExtract for intermediate extraction. If disabled (default), full page content is used for synthesis.")] = False,
     langextract_max_char_buffer: Annotated[int, typer.Option(help="Max chars per chunk for LangExtract; smaller values prevent API hangs but increase API calls.")] = 5000,
+    gemini_api_key: Annotated[Optional[str], typer.Option(help="Gemini API key (overrides GEMINI_API_KEY env var)")] = None,
+    firecrawl_api_key: Annotated[Optional[str], typer.Option(help="Firecrawl API key (overrides FIRECRAWL_API_KEY env var)")] = None,
 ):
     """
     Process URLs from a file, snapshot them, and extract AI risk information.
@@ -326,7 +328,8 @@ def process(
         urls.append(url)
 
     # Check for Gemini API key (required for all modes except pure firecrawl crawling)
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    # Priority: CLI flag > env var > prompt
+    api_key = gemini_api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
         api_key = _prompt_for_api_key(
             key_name="GEMINI_API_KEY",
@@ -368,29 +371,33 @@ def process(
             raise typer.Exit(code=1)
 
         # Firecrawl API key is required for agent mode
-        firecrawl_api_key = os.getenv("FIRECRAWL_API_KEY")
-        if not firecrawl_api_key:
-            firecrawl_api_key = _prompt_for_api_key(
+        # Priority: CLI flag > env var > prompt
+        fc_api_key = firecrawl_api_key or os.getenv("FIRECRAWL_API_KEY")
+        if not fc_api_key:
+            fc_api_key = _prompt_for_api_key(
                 key_name="FIRECRAWL_API_KEY",
                 description="Firecrawl API",
                 url="https://firecrawl.dev/",
                 required=True
             )
+        firecrawl_api_key = fc_api_key
     elif engine == "firecrawl":
         # Firecrawl API key is recommended but optional for non-agent crawling
-        firecrawl_api_key = os.getenv("FIRECRAWL_API_KEY")
-        if not firecrawl_api_key:
+        # Priority: CLI flag > env var > prompt
+        fc_api_key = firecrawl_api_key or os.getenv("FIRECRAWL_API_KEY")
+        if not fc_api_key:
             console.print(Panel(
                 "[yellow]Note: using 'firecrawl' without FIRECRAWL_API_KEY.[/yellow]\n"
                 "For best results, you can provide your Firecrawl API key.",
                 border_style="yellow"
             ))
-            firecrawl_api_key = _prompt_for_api_key(
+            fc_api_key = _prompt_for_api_key(
                 key_name="FIRECRAWL_API_KEY",
                 description="Firecrawl API",
                 url="https://firecrawl.dev/",
                 required=False
             )
+        firecrawl_api_key = fc_api_key
 
 
     import json
@@ -410,7 +417,6 @@ def process(
     
     # Initialize the appropriate extractor
     if agent:
-        firecrawl_api_key = os.getenv("FIRECRAWL_API_KEY")
         extractor = FirecrawlAgentExtractor(
             api_key=firecrawl_api_key,
             spark_model=spark_model,
@@ -421,7 +427,6 @@ def process(
     else:
         # Standard mode: Use LangGraph workflow
         extractor = None  # Graph workflow is invoked per-URL
-        firecrawl_api_key = os.getenv("FIRECRAWL_API_KEY")
         model_info = MODEL_TIERS.get(gemini_tier, MODEL_TIERS["cheap"])
         console.print(f"[dim]Using LangGraph workflow with model: {model_info['langchain_model']}[/dim]")
 
