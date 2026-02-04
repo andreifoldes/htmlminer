@@ -288,12 +288,33 @@ def fetch_firecrawl_map_urls(
             error_body = e.read().decode("utf-8", errors="replace")
         except Exception:
             pass
-        console.print(f"[red]Firecrawl API error ({e.code}):[/red] {e.reason}")
-        if error_body:
-            console.print(f"[dim]{error_body[:500]}[/dim]")
+        
+        # Parse and display helpful error message
+        error_msg = f"Firecrawl map API error ({e.code})"
+        try:
+            error_data = json.loads(error_body) if error_body else {}
+            if error_data.get("error"):
+                error_msg += f": {error_data['error']}"
+        except Exception:
+            if error_body:
+                error_msg += f": {error_body[:200]}"
+        
+        console.print(f"[red]{error_msg}[/red]")
+        
+        # Actionable hints
+        if e.code == 400:
+            console.print(f"[dim]  Hint: The site may be blocking Firecrawl. Will fall back to traditional sitemap parsing.[/dim]")
+        elif e.code == 401:
+            console.print(f"[dim]  Hint: Invalid API key. Check your FIRECRAWL_API_KEY.[/dim]")
+        elif e.code == 402:
+            console.print(f"[dim]  Hint: Insufficient credits. Upgrade at https://firecrawl.dev/pricing[/dim]")
+        elif e.code == 429:
+            console.print(f"[dim]  Hint: Rate limited. Try again later.[/dim]")
+        
         return []
     except urllib.error.URLError as e:
         console.print(f"[red]Firecrawl connection error:[/red] {e.reason}")
+        console.print(f"[dim]  Hint: Check your internet connection or firewall settings.[/dim]")
         return []
     except Exception as e:
         console.print(f"[red]Firecrawl map error:[/red] {e}")
@@ -321,16 +342,55 @@ def _scrape_url_with_requests(page_url: str, api_key: str, timeout_s: int = 60) 
         )
         
         if response.status_code != 200:
-            console.print(f"[red]Firecrawl API error ({response.status_code}):[/red] {response.text[:200]}")
+            # Parse error details for better messaging
+            error_msg = f"Firecrawl API error ({response.status_code})"
+            try:
+                error_data = response.json()
+                if error_data.get("error"):
+                    error_msg += f": {error_data['error']}"
+                elif error_data.get("message"):
+                    error_msg += f": {error_data['message']}"
+            except Exception:
+                error_msg += f": {response.text[:200]}"
+            
+            # Provide actionable hints based on status code
+            if response.status_code == 400:
+                console.print(f"[red]{error_msg}[/red]")
+                console.print(f"[dim]  Hint: The URL may be blocked, malformed, or the site may be rejecting Firecrawl requests.[/dim]")
+            elif response.status_code == 401:
+                console.print(f"[red]{error_msg}[/red]")
+                console.print(f"[dim]  Hint: Invalid API key. Check your FIRECRAWL_API_KEY.[/dim]")
+            elif response.status_code == 402:
+                console.print(f"[red]{error_msg}[/red]")
+                console.print(f"[dim]  Hint: Insufficient Firecrawl credits. Upgrade at https://firecrawl.dev/pricing[/dim]")
+            elif response.status_code == 429:
+                console.print(f"[red]{error_msg}[/red]")
+                console.print(f"[dim]  Hint: Rate limited. Try again later or reduce request frequency.[/dim]")
+            elif response.status_code >= 500:
+                console.print(f"[red]{error_msg}[/red]")
+                console.print(f"[dim]  Hint: Firecrawl server error. Try again later.[/dim]")
+            else:
+                console.print(f"[red]{error_msg}[/red]")
             return None
             
         data = response.json()
         # Response structure: {"success": true, "data": {"markdown": "..."}}
         if data.get("success") and data.get("data"):
             return data["data"].get("markdown")
+        
+        # Success=false but got 200?
+        if not data.get("success"):
+            console.print(f"[yellow]Firecrawl returned success=false for {page_url}[/yellow]")
+            if data.get("error"):
+                console.print(f"[dim]  Error: {data['error']}[/dim]")
         return None
     except requests.exceptions.Timeout:
         console.print(f"[red]Firecrawl request timeout for {page_url}[/red]")
+        console.print(f"[dim]  Hint: The site may be slow or blocking requests. Consider using --engine trafilatura[/dim]")
+        return None
+    except requests.exceptions.ConnectionError as e:
+        console.print(f"[red]Firecrawl connection error for {page_url}[/red]")
+        console.print(f"[dim]  Hint: Check your internet connection or try again later.[/dim]")
         return None
     except Exception as e:
         console.print(f"[red]Firecrawl request error for {page_url}:[/red] {e}")
