@@ -425,6 +425,17 @@ def process(
             )
         firecrawl_api_key = fc_api_key
 
+    # Display API keys being used (masked for security)
+    def _mask_key(key: str) -> str:
+        if not key:
+            return "[not set]"
+        if len(key) <= 8:
+            return key[:2] + "*" * (len(key) - 2)
+        return key[:4] + "*" * (len(key) - 8) + key[-4:]
+
+    console.print(f"[dim]Gemini API Key:[/dim] {_mask_key(api_key)}")
+    if firecrawl_api_key:
+        console.print(f"[dim]Firecrawl API Key:[/dim] {_mask_key(firecrawl_api_key)}")
 
     import json
     
