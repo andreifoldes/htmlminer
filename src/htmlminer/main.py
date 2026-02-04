@@ -303,6 +303,7 @@ def process(
     file: Annotated[Optional[str], typer.Option(help="Path to markdown file containing URLs")] = None,
     url: Annotated[Optional[str], typer.Option(help="Single URL to process")] = None,
     output: Annotated[str, typer.Option(help="Path to output file (e.g. results.json or results.csv)")] = "results.json",
+    config: Annotated[Optional[str], typer.Option(help="Path to config.json with feature definitions")] = None,
     engine: Annotated[str, typer.Option(help="Engine to use: 'firecrawl' (default) or 'trafilatura'. For Firecrawl, set FCRAWL_API_KEY in .env for best results.")] = "firecrawl",
     max_paragraphs: Annotated[int, typer.Option(help="Max paragraphs per dimension in agentic summary")] = 3,
     synthesis_top: Annotated[int, typer.Option(help="Max longest snippets per feature to send to synthesis")] = 50,
@@ -471,19 +472,28 @@ def process(
         }
     ]
     
-    config_path = "config.json"
+    # Determine config path: CLI flag > current directory > defaults
+    config_path = config if config else "config.json"
     extraction_config = None
+    
+    if config and not os.path.exists(config_path):
+        # User specified a config file that doesn't exist
+        console.print(f"[bold red]Error:[/bold red] Config file not found: {config_path}")
+        raise typer.Exit(code=1)
+    
     if os.path.exists(config_path):
         with open(config_path, 'r') as f:
             try:
                 extraction_config = json.load(f).get("features", [])
+                if config:
+                    console.print(f"[dim]Using config: {config_path}[/dim]")
             except json.JSONDecodeError:
                 console.print(f"[bold red]Error:[/bold red] Failed to parse {config_path}.")
                 raise typer.Exit(code=1)
     else:
         # Use default features when config.json is not found
         extraction_config = DEFAULT_FEATURES
-        console.print(f"[dim]Using default features (Risk, Goal, Method). Create config.json to customize.[/dim]")
+        console.print(f"[dim]Using default features (Risk, Goal, Method). Use --config to specify custom features.[/dim]")
     
     results = []
     session_page_cache = {}
