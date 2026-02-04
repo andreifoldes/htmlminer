@@ -332,7 +332,6 @@ def _scrape_url_with_requests(page_url: str, api_key: str, timeout_s: int = 60) 
             json={
                 "url": page_url,
                 "formats": ["markdown"],
-                "onlyMainContent": False,
             },
             headers={
                 "Authorization": f"Bearer {api_key}",
