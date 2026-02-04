@@ -452,6 +452,25 @@ def process(
 
     import json
     
+    # Default features if config.json is not found
+    DEFAULT_FEATURES = [
+        {
+            "name": "Risk",
+            "description": "Any mentioned risks, dangers, or negative impacts of AI development.",
+            "synthesis_topic": "Their risk assessment (ie what risks does AI development pose)"
+        },
+        {
+            "name": "Goal",
+            "description": "High-level goals, missions, or objectives (e.g., 'AI alignment' or global AI agreement).",
+            "synthesis_topic": "The goals (often pretty high-level e.g. 'AI alignment')"
+        },
+        {
+            "name": "Method",
+            "description": "Strategies, activities, or actions taken to achieve the goals (research, grantmaking, policy work, etc.).",
+            "synthesis_topic": "The methods used in service of the goals"
+        }
+    ]
+    
     config_path = "config.json"
     extraction_config = None
     if os.path.exists(config_path):
@@ -461,6 +480,10 @@ def process(
             except json.JSONDecodeError:
                 console.print(f"[bold red]Error:[/bold red] Failed to parse {config_path}.")
                 raise typer.Exit(code=1)
+    else:
+        # Use default features when config.json is not found
+        extraction_config = DEFAULT_FEATURES
+        console.print(f"[dim]Using default features (Risk, Goal, Method). Create config.json to customize.[/dim]")
     
     results = []
     session_page_cache = {}
