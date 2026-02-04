@@ -454,10 +454,13 @@ def scrape_pages_node(state: HTMLMinerState) -> dict:
                 except Exception as e:
                     log_event(session_id, "graph", "WARNING", f"Failed to scrape {page['url']}: {e}")
 
+        failed_urls = []
         for page in selected_pages:
             page_url = page["url"]
             content = cached_by_url.get(page_url) or results_by_url.get(page_url)
             if not content:
+                failed_urls.append(page_url)
+                log_event(session_id, "graph", "WARNING", f"No content returned for {page_url}")
                 continue
             scraped.append(
                 {
@@ -466,14 +469,22 @@ def scrape_pages_node(state: HTMLMinerState) -> dict:
                     "relevance_score": page.get("relevance_score", 5),
                 }
             )
-        
+
         timer.set_details(
-            {"scraped_count": len(scraped), "cached_count": len(cached_by_url)}
+            {"scraped_count": len(scraped), "cached_count": len(cached_by_url), "failed_count": len(failed_urls)}
         )
-    
+
     log_event(session_id, "graph", "INFO", f"Scraped {len(scraped)} pages")
-    
-    return {"scraped_pages": scraped}
+
+    # Build warnings for CLI display
+    scrape_warnings = []
+    if failed_urls:
+        scrape_warnings.append(f"Failed to retrieve content from {len(failed_urls)} page(s): {', '.join(failed_urls[:3])}{'...' if len(failed_urls) > 3 else ''}")
+    if not scraped:
+        scrape_warnings.append("No page content was retrieved. The site may be blocking scrapers or returning empty responses.")
+        log_event(session_id, "graph", "ERROR", "Scraping returned no content for any selected pages", {"failed_urls": failed_urls})
+
+    return {"scraped_pages": scraped, "scrape_warnings": scrape_warnings}
 
 
 # =============================================================================
@@ -678,13 +689,22 @@ def synthesize_node(state: HTMLMinerState) -> dict:
     raw_counts = state.get("raw_counts", {})
     
     if not features:
+        log_event(session_id, "graph", "WARNING", "No features configured - skipping synthesis")
+        if state.get("status_callback"):
+            state["status_callback"]("No features configured - skipping synthesis")
         return {"results": {"URL": url, "Counts": {}}}
-    
+
     # If using langextract, we need extractions. If not, we need scraped pages.
     if use_langextract and not page_extractions:
+        log_event(session_id, "graph", "WARNING", "No extractions available for synthesis")
+        if state.get("status_callback"):
+            state["status_callback"]("No extractions available - cannot synthesize results")
         return {"results": {"URL": url, "Counts": {}}}
     if not use_langextract and not scraped_pages:
-         return {"results": {"URL": url, "Counts": {}}}
+        log_event(session_id, "graph", "WARNING", "No scraped content available for synthesis")
+        if state.get("status_callback"):
+            state["status_callback"]("No scraped content available - cannot synthesize results")
+        return {"results": {"URL": url, "Counts": {}}}
 
     model_name = MODEL_TIERS.get(model_tier, MODEL_TIERS["cheap"])["langchain_model"]
     results = {"URL": url, "Counts": raw_counts}

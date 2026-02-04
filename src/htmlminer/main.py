@@ -535,7 +535,12 @@ def process(
                     # Display summary
                     scraped_count = len(final_state.get("scraped_pages", []))
                     progress.console.print(f"  [green]✓[/green] Workflow complete ({scraped_count} pages processed)")
-                
+
+                    # Display any scrape warnings
+                    scrape_warnings = final_state.get("scrape_warnings", [])
+                    for warning in scrape_warnings:
+                        progress.console.print(f"  [bold yellow]⚠[/bold yellow] {warning}")
+
                 progress.remove_task(current_task)
                 progress.advance(overall_task)
                 
@@ -568,11 +573,11 @@ def process(
 
     save_results(results, output, metadata=metadata)
     save_extractions(results, session_id)
-    console.print(f"\n[bold green]✓[/bold green] Results saved to [bold]{output}[/bold]")
+    console.print(f"\n[bold green]✓[/bold green] Results saved to [bold]{os.path.abspath(output)}[/bold]")
 
     # Export summary CSV
     summary_csv_path = "summary.csv"
-    save_summary_csv(results, summary_csv_path)
+    save_summary_csv(results, summary_csv_path, show_full_path=True)
 
     display_results(results)
     
@@ -609,7 +614,7 @@ def process(
             )
 
             console.print(token_table)
-            console.print("[dim]Token usage details saved to logs/htmlminer_logs.db (step_timings table)[/dim]")
+            console.print(f"[dim]Token usage details saved to {os.path.abspath('logs/htmlminer_logs.db')} (step_timings table)[/dim]")
         else:
             console.print("[dim]No token usage data recorded for this session.[/dim]")
     else:

@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 from rich.console import Console
 from rich.table import Table
@@ -28,15 +29,15 @@ def save_results(results: List[Dict], output_file: str, metadata: Optional[Dict]
         # Add timestamp if not present
         if "timestamp" not in output_data["metadata"]:
             output_data["metadata"]["timestamp"] = datetime.now().isoformat()
-        
+
         with open(output_file, 'w') as f:
             json.dump(output_data, f, indent=4, default=str)
     else:
         df.to_csv(output_file, index=False)
-        
-    console.print(f"[green]Results saved to {output_file}[/green]")
 
-def save_summary_csv(results: List[Dict], output_file: str):
+    console.print(f"[green]Results saved to {os.path.abspath(output_file)}[/green]")
+
+def save_summary_csv(results: List[Dict], output_file: str, show_full_path: bool = False):
     """
     Saves a summary CSV with URL, feature columns, and a counts column.
     This matches the CLI table format.
@@ -75,7 +76,8 @@ def save_summary_csv(results: List[Dict], output_file: str):
     # Save to CSV
     df = pd.DataFrame(csv_data)
     df.to_csv(output_file, index=False)
-    console.print(f"[green]Summary saved to {output_file}[/green]")
+    display_path = os.path.abspath(output_file) if show_full_path else output_file
+    console.print(f"[green]Summary saved to {display_path}[/green]")
 
 def display_results(results: List[Dict]):
     """

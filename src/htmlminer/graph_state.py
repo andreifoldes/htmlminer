@@ -58,6 +58,7 @@ class HTMLMinerState(TypedDict, total=False):
     
     # === Scraping Phase ===
     scraped_pages: list[PageInfo]  # Scraped page content
+    scrape_warnings: list[str]  # Warnings from scraping (e.g., failed URLs)
     
     # === Extraction Phase (coarse mode - per page) ===
     page_extractions: dict[str, dict[str, list[str]]]  # {url: {feature: [snippets]}}
