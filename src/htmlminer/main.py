@@ -232,7 +232,7 @@ def _prompt_for_api_key(key_name: str, description: str, url: str, required: boo
 
             # Write back to .env
             env_file.write_text('\n'.join(new_lines))
-            console.print(f"[green]✓[/green] {key_name} saved to .env file")
+            console.print(f"[green]✓[/green] {key_name} saved to [bold]{env_file.resolve()}[/bold]")
 
         except Exception as e:
             console.print(f"[yellow]Warning: Could not save to .env file: {e}[/yellow]")
