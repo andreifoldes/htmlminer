@@ -575,6 +575,26 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
     page_extractions = {}
     raw_counts = {f["name"]: 0 for f in features}
     
+    # Print extraction plan with page sizes and time estimate
+    valid_pages = [p for p in scraped_pages if p.get("content") and len(p.get("content", "").strip()) >= 100]
+    if valid_pages and state.get("status_callback"):
+        console.print(f"\n[bold cyan]LangExtract Plan:[/bold cyan]")
+        total_chars = 0
+        for idx, page in enumerate(valid_pages, 1):
+            content = page.get("content", "")
+            char_count = len(content)
+            total_chars += char_count
+            # Estimate: ~5s per feature if content < buffer, else ~5s per chunk
+            chunks = max(1, char_count // max_char_buffer)
+            console.print(f"  {idx}. {page['url'][:60]}... ({char_count:,} chars, {chunks} chunk{'s' if chunks > 1 else ''})")
+        
+        total_api_calls = len(valid_pages) * len(features)
+        # ~5s per API call average
+        est_seconds = total_api_calls * 5
+        est_minutes = est_seconds / 60
+        console.print(f"\n[dim]  Total: {len(valid_pages)} pages × {len(features)} features = {total_api_calls} API calls[/dim]")
+        console.print(f"[dim]  Estimated time: ~{est_minutes:.1f} minutes ({total_chars:,} total chars)[/dim]\n")
+    
     with StepTimingWrapper("extract_pages", session_id, url, status_callback=state.get("status_callback")) as timer:
         for i, page in enumerate(scraped_pages):
             page_url = page["url"]
@@ -584,6 +604,8 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
                 continue
             
             page_extractions[page_url] = {}
+            page_start_time = time.time()
+            feature_timings = []
             
             # Process each feature separately (sequential for now)
             for feature in features:
@@ -594,6 +616,7 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
                     kb_size = len(content) / 1024
                     state["status_callback"](f"Extracting '{feature_name}' from page {i+1}/{len(scraped_pages)} ({kb_size:.1f}KB)...")
                 
+                feature_start_time = time.time()
                 with StepTimingWrapper(f"extract_{feature_name}", session_id, page_url):
                     try:
                         # Create examples for this feature
@@ -601,6 +624,7 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
                         
                         # Let langextract handle its own chunking internally
                         # Use max_workers=1 to avoid parallel API calls that may cause rate limiting
+                        # Disable fuzzy_alignment which has O(n³) complexity and causes hangs
                         annotated_doc = lx.extract(
                             content,  # Pass full content, langextract handles chunking
                             prompt_description=feature_desc,
@@ -612,7 +636,10 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
                             max_workers=1,  # Serialize to avoid rate limiting
                             debug=False,
                             show_progress=False,  # Disable progress bar output
+                            resolver_params={"enable_fuzzy_alignment": False},  # Avoid O(n³) alignment
                         )
+                        
+                        feature_elapsed = time.time() - feature_start_time
                         
                         # Extract snippets from AnnotatedDocument
                         snippets = [
@@ -624,6 +651,11 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
                         
                         page_extractions[page_url][feature_name] = snippets
                         raw_counts[feature_name] += len(snippets)
+                        
+                        # Show feature-level timing in status callback
+                        if state.get("status_callback"):
+                            state["status_callback"](f"  ✓ '{feature_name}' extracted in {feature_elapsed:.2f}s ({len(snippets)} snippets)")
+                        feature_timings.append((feature_name, feature_elapsed, len(snippets)))
                         
                         # Estimate usage (approx 4 chars/token)
                         total_input_chars = len(content) + len(feature_desc)
@@ -641,11 +673,23 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
                         timer.set_details({"tokens": current_tokens})
 
                     except Exception as e:
+                        feature_elapsed = time.time() - feature_start_time
+                        feature_timings.append((feature_name, feature_elapsed, 0))
+                        # Show feature-level timing for failures too
+                        if state.get("status_callback"):
+                            state["status_callback"](f"  ✗ '{feature_name}' failed in {feature_elapsed:.2f}s")
                         log_event(
                             session_id, "graph", "WARNING",
                             f"Extract failed for {feature_name} on {page_url}: {e}"
                         )
                         page_extractions[page_url][feature_name] = []
+            
+            # Print page extraction summary
+            page_elapsed = time.time() - page_start_time
+            short_url = page_url[:50] + "..." if len(page_url) > 50 else page_url
+            feature_summary = " | ".join([f"{name}: {elapsed:.1f}s ({count})" for name, elapsed, count in feature_timings])
+            console.print(f"  [green]✓[/green] Page {i+1}: {short_url} [dim]({page_elapsed:.1f}s total)[/dim]")
+            console.print(f"    [dim]{feature_summary}[/dim]")
         
         timer.set_details({
             "page_count": len(page_extractions),

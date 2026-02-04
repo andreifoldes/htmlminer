@@ -1,5 +1,5 @@
 import typer
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv, set_key
 import os
 import sys
 import platform
@@ -28,9 +28,17 @@ from .firecrawl_agent import FirecrawlAgentExtractor, SPARK_MODELS
 from .storage import save_results, display_results, save_summary_csv
 
 from .database import init_db, create_session, log_event, save_extractions, save_page_relevance, log_step_timing, get_token_usage_report
-from . import __version__
+from ._version import __version__, get_version, get_version_info
 
-load_dotenv(find_dotenv())
+# Use consistent .env location: ~/.htmlminer/.env
+HOME_ENV_DIR = Path.home() / ".htmlminer"
+HOME_ENV_FILE = HOME_ENV_DIR / ".env"
+
+# Load from multiple locations: CWD first, then home dir
+if Path(".env").exists():
+    load_dotenv(Path(".env"))
+elif HOME_ENV_FILE.exists():
+    load_dotenv(HOME_ENV_FILE)
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 console = Console()
@@ -217,39 +225,17 @@ def _prompt_for_api_key(key_name: str, description: str, url: str, required: boo
 
     if save_to_env:
         try:
-            env_file = Path(".env")
-
-            # Read existing .env content if it exists
-            existing_content = ""
-            if env_file.exists():
-                existing_content = env_file.read_text()
-
-            # Check if key already exists in file
-            lines = existing_content.split('\n')
-            key_exists = False
-            new_lines = []
-
-            for line in lines:
-                if line.strip().startswith(f"{key_name}="):
-                    # Replace existing key
-                    new_lines.append(f"{key_name}={api_key}")
-                    key_exists = True
-                else:
-                    new_lines.append(line)
-
-            # Add new key if it doesn't exist
-            if not key_exists:
-                if existing_content and not existing_content.endswith('\n'):
-                    new_lines.append('')  # Add newline before new entry
-                new_lines.append(f"{key_name}={api_key}")
-
-            # Write back to .env
-            env_file.write_text('\n'.join(new_lines))
-            console.print(f"[green]✓[/green] {key_name} saved to [bold]{env_file.resolve()}[/bold]")
+            # Save to ~/.htmlminer/.env for persistence across directories
+            HOME_ENV_DIR.mkdir(parents=True, exist_ok=True)
+            env_file = HOME_ENV_FILE
+            
+            # Use python-dotenv's set_key for proper handling
+            set_key(str(env_file), key_name, api_key)
+            console.print(f"[green]✓[/green] {key_name} saved to [bold]{env_file}[/bold]")
 
         except Exception as e:
             console.print(f"[yellow]Warning: Could not save to .env file: {e}[/yellow]")
-            console.print("[dim]You can manually add it to .env later[/dim]")
+            console.print("[dim]You can manually add it to ~/.htmlminer/.env later[/dim]")
     else:
         console.print(f"[dim]{key_name} will only be used for this session[/dim]")
 
@@ -267,7 +253,12 @@ def _main_callback(ctx: typer.Context):
 @app.command()
 def version():
     """Show the version of the application."""
-    console.print(f"htmlminer v{__version__}")
+    info = get_version_info()
+    console.print(f"htmlminer v{info['full_version']}")
+    if info['git_hash']:
+        console.print(f"Git commit: {info['git_hash']}" + (" (dirty)" if info['git_dirty'] else ""))
+        if info['commit_count']:
+            console.print(f"Commit count: {info['commit_count']}")
     console.print(f"Platform: {platform.system()} {platform.release()}")
     console.print(f"Python: {sys.version.split()[0]}")
 
@@ -276,15 +267,15 @@ def reset_env(
     force: Annotated[bool, typer.Option("--force", "-f", help="Skip confirmation prompt")] = False,
 ):
     """Reset the .env file by removing all saved API keys."""
-    env_file = Path(".env")
+    env_file = HOME_ENV_FILE
 
     if not env_file.exists():
-        console.print(f"[yellow]No .env file found at {env_file.resolve()}[/yellow]")
+        console.print(f"[yellow]No .env file found at {env_file}[/yellow]")
         return
 
     if not force:
         confirm = Confirm.ask(
-            f"[bold red]This will delete all saved API keys in {env_file.resolve()}.[/bold red] Continue?",
+            f"[bold red]This will delete all saved API keys in {env_file}.[/bold red] Continue?",
             default=False
         )
         if not confirm:
@@ -304,19 +295,19 @@ def process(
     url: Annotated[Optional[str], typer.Option(help="Single URL to process")] = None,
     output: Annotated[str, typer.Option(help="Path to output file (e.g. results.json or results.csv)")] = "results.json",
     config: Annotated[Optional[str], typer.Option(help="Path to config.json with feature definitions")] = None,
-    engine: Annotated[str, typer.Option(help="Engine to use: 'firecrawl' (default) or 'trafilatura'. For Firecrawl, set FCRAWL_API_KEY in .env for best results.")] = "firecrawl",
+    engine: Annotated[str, typer.Option(help="Engine to use: 'firecrawl' (default) or 'trafilatura'. For Firecrawl, set FIRECRAWL_API_KEY in .env for best results.")] = "firecrawl",
     max_paragraphs: Annotated[int, typer.Option(help="Max paragraphs per dimension in agentic summary")] = 3,
     synthesis_top: Annotated[int, typer.Option(help="Max longest snippets per feature to send to synthesis")] = 50,
     llm_timeout: Annotated[int, typer.Option(help="Timeout in seconds for LLM requests (Gemini/DSpy), capped at 600.")] = STEP_TIMEOUT_S,
     gemini_tier: Annotated[str, typer.Option(help="Gemini model tier: 'cheap' or 'expensive'.")] = "cheap",
     smart: Annotated[bool, typer.Option(help="Enable smart crawling to discover and analyze sub-pages (e.g. /about, /research).")] = True,
     limit: Annotated[int, typer.Option(help="Max pages per feature to select from the sitemap when using --smart. Default 10.")] = 10,
-    agent: Annotated[bool, typer.Option(help="Use Firecrawl Agent SDK for extraction (requires FCRAWL_API_KEY).")] = False,
+    agent: Annotated[bool, typer.Option(help="Use Firecrawl Agent SDK for extraction (requires FIRECRAWL_API_KEY).")] = False,
     spark_model: Annotated[str, typer.Option(help="Spark model for --agent mode: 'mini' (default) or 'pro'.")] = "mini",
     langextract: Annotated[bool, typer.Option(help="Enable LangExtract for intermediate extraction. If disabled (default), full page content is used for synthesis.")] = False,
     langextract_max_char_buffer: Annotated[int, typer.Option(help="Max chars per chunk for LangExtract; smaller values prevent API hangs but increase API calls.")] = 5000,
     gemini_api_key: Annotated[Optional[str], typer.Option(help="Gemini API key (overrides GEMINI_API_KEY env var)")] = None,
-    firecrawl_api_key: Annotated[Optional[str], typer.Option(help="Firecrawl API key (overrides FCRAWL_API_KEY env var)")] = None,
+    firecrawl_api_key: Annotated[Optional[str], typer.Option(help="Firecrawl API key (overrides FIRECRAWL_API_KEY env var)")] = None,
 ):
     """
     Process URLs from a file, snapshot them, and extract AI risk information.
@@ -344,7 +335,8 @@ def process(
     )
 
     mode_label = "Firecrawl Agent" if agent else "Agentic Extraction"
-    console.print(Panel.fit(f"[bold cyan]HTMLMiner: {mode_label}[/bold cyan]", border_style="cyan"))
+    version_str = get_version()
+    console.print(Panel.fit(f"[bold cyan]HTMLMiner v{version_str}: {mode_label}[/bold cyan]", border_style="cyan"))
     console.print(f"[dim]Session ID:[/dim] {session_id}")
 
     if not file and not url:
@@ -412,10 +404,10 @@ def process(
 
         # Firecrawl API key is required for agent mode
         # Priority: CLI flag > env var > prompt
-        fc_api_key = firecrawl_api_key or os.getenv("FCRAWL_API_KEY")
+        fc_api_key = firecrawl_api_key or os.getenv("FIRECRAWL_API_KEY") or os.getenv("FIRECRAWL_API_KEY")
         if not fc_api_key:
             fc_api_key = _prompt_for_api_key(
-                key_name="FCRAWL_API_KEY",
+                key_name="FIRECRAWL_API_KEY",
                 description="Firecrawl API",
                 url="https://firecrawl.dev/",
                 required=True
@@ -424,15 +416,15 @@ def process(
     elif engine == "firecrawl":
         # Firecrawl API key is recommended but optional for non-agent crawling
         # Priority: CLI flag > env var > prompt
-        fc_api_key = firecrawl_api_key or os.getenv("FCRAWL_API_KEY")
+        fc_api_key = firecrawl_api_key or os.getenv("FIRECRAWL_API_KEY") or os.getenv("FIRECRAWL_API_KEY")
         if not fc_api_key:
             console.print(Panel(
-                "[yellow]Note: using 'firecrawl' without FCRAWL_API_KEY.[/yellow]\n"
+                "[yellow]Note: using 'firecrawl' without FIRECRAWL_API_KEY.[/yellow]\n"
                 "For best results, you can provide your Firecrawl API key.",
                 border_style="yellow"
             ))
             fc_api_key = _prompt_for_api_key(
-                key_name="FCRAWL_API_KEY",
+                key_name="FIRECRAWL_API_KEY",
                 description="Firecrawl API",
                 url="https://firecrawl.dev/",
                 required=False

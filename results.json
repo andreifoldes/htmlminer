@@ -1,7 +1,7 @@
 {
     "metadata": {
-        "timestamp": "2026-02-04T17:16:39.714898",
-        "session_id": "76044706-c955-4b8a-8f2d-357cd3cf3804",
+        "timestamp": "2026-02-04T20:23:30.544281",
+        "session_id": "d933b220-ee9f-49d2-8130-f4c4734ebe33",
         "sitemaps": {
             "https://deepmind.google/about/": [
                 "https://deepmind.google/",
@@ -510,15 +510,15 @@
             "https://deepmind.google/about/": {
                 "https://deepmind.google/about/": {
                     "overall": 10,
-                    "Risk": 9,
+                    "Risk": 8,
                     "Goal": 10,
                     "Method": 9
                 },
                 "https://deepmind.google/models/gemini-robotics/responsibly-advancing-ai-and-robotics/": {
-                    "overall": 10,
+                    "overall": 9,
                     "Risk": 10,
-                    "Goal": 7,
-                    "Method": 10
+                    "Goal": 9,
+                    "Method": 9
                 },
                 "https://deepmind.google/": {
                     "overall": 9,
@@ -527,53 +527,23 @@
                     "Method": 8
                 },
                 "https://deepmind.google/research/": {
-                    "overall": 9,
-                    "Risk": 7,
+                    "overall": 8,
+                    "Risk": 6,
                     "Goal": 8,
                     "Method": 10
                 },
-                "https://deepmind.google/models/model-cards/": {
-                    "overall": 9,
-                    "Risk": 9,
-                    "Goal": 6,
-                    "Method": 9
-                },
                 "https://deepmind.google/research/projects/": {
-                    "overall": 8,
-                    "Risk": 6,
-                    "Goal": 7,
-                    "Method": 9
-                },
-                "https://deepmind.google/models/synthid/": {
-                    "overall": 8,
-                    "Risk": 9,
-                    "Goal": 6,
-                    "Method": 8
-                },
-                "https://deepmind.google/models/": {
                     "overall": 7,
                     "Risk": 5,
-                    "Goal": 6,
-                    "Method": 7
-                },
-                "https://deepmind.google/models/gemini/": {
-                    "overall": 7,
-                    "Risk": 7,
-                    "Goal": 6,
-                    "Method": 7
-                },
-                "https://deepmind.google/models/gemma/": {
-                    "overall": 7,
-                    "Risk": 7,
-                    "Goal": 6,
-                    "Method": 7
+                    "Goal": 7,
+                    "Method": 9
                 }
             }
         },
         "parameters": {
             "engine": "firecrawl",
             "smart": true,
-            "limit": 10,
+            "limit": 5,
             "max_paragraphs": 3,
             "gemini_tier": "cheap",
             "agent_mode": false,
@@ -587,8 +557,160 @@
     "results": [
         {
             "URL": "https://deepmind.google/about/",
-            "Counts": {},
-            "Raw_Extraction_By_Page": {}
+            "Counts": {
+                "Risk": 5,
+                "Goal": 50,
+                "Method": 57
+            },
+            "Risk": "The organization acknowledges several risks associated with its AI development, particularly in robotics. A primary concern is that their models have not been tested across every make or model of robot, indicating potential compatibility or performance issues in diverse environments. Furthermore, the developed features are explicitly stated not to be guaranteed safety-rated systems, highlighting a limitation in their current safety assurances. The organization also recognizes the existence of vulnerabilities within its robotics models, which could lead to unintended or harmful behaviors. Specific examples of potential risks include a robot inadvertently handing a boiling drink to a young child or passing a very heavy box to a human, underscoring the need for robust safety measures and extensive testing to prevent such incidents.",
+            "Goal": "DeepMind's primary goals center on responsibly advancing AI and robotics to benefit humanity. A core focus is establishing a rigorous safety framework for AI systems, particularly for Gemini-controlled robots, ensuring they operate with logic, common sense, and appropriate behavior in real-life and social environments. This commitment extends to building the next generation of AI systems safely, preventing accidental harm, and enhancing the AI safety community's understanding of complex language model behavior.\n\nThe organization aims to create breakthrough technologies that accelerate innovation and scientific discovery, tackling complex challenges across various domains. This includes discovering novel, efficient algorithms for computing, improving weather prediction accuracy, designing proteins, and solving problems in fusion energy and material science. They also develop advanced AI agents for virtual worlds, master complex games, and enable robots to perform dexterous tasks and translate vision and language into action.\n\nUltimately, DeepMind seeks to transform work, serve diverse communities, and improve billions of people's lives by making AI universally accessible and useful. Their efforts are directed towards building AI responsibly to solve humanity's biggest challenges, from helping historians interpret texts and scientists understand molecular interactions to enabling automatic speech recognition across hundreds of languages and generating realistic video.",
+            "Method": "DeepMind pursues its goals by pioneering deep reinforcement learning and an interdisciplinary approach to building general AI systems, leveraging unparalleled computing infrastructure to achieve research breakthroughs and transformative products. They focus on solving complex scientific and engineering challenges, exploring increasingly complex games to capture different elements of intelligence, and developing general-purpose world models like Genie 3. The organization also supports initiatives like the U.S. Department of Energy on Genesis and partners with the UK AI Security Institute. \n\nTheir methods involve applying complex machine learning systems to enhance Google's products, such as ranking search results and organizing online ads. Research spans diverse areas including the creation of visual-language-action models (RT-2, PaLM-SayCan), advancing regulatory variant-effect prediction (AlphaGenome), and generating unified data representations (AlphaEarth Foundations). DeepMind develops AI models for natural-sounding speech, global weather forecasting, writing computer programs, discovering algorithms, mastering real-time strategy games, and text-to-image generation (Imagen), alongside solving problems in material science and protein structure prediction.\n\nA core method involves a holistic approach to responsibility and safety, particularly in robotics. This includes developing a broad and rigorous safety framework with multiple layers of semantic, physical, and operational safeguards. They implement best practices for safe data collection and evaluation, identify risks in physical surroundings and videos, and create systems that continuously search for vulnerabilities. Specific safety measures for robotics include generating Robot Constitutions, learning Model Predictive Controllers with real-time attention, designing models for safe decision-making, optimizing trajectories, and implementing safeguards for human-robot interaction, such as detecting humans in operating areas and stopping work to prevent accidental harm. They also evaluate policies in simulators and release new datasets and benchmarks to advance the AI safety community's understanding.",
+            "Raw_Extraction_By_Page": {
+                "Risk": {
+                    "https://deepmind.google/about/": [],
+                    "https://deepmind.google/models/gemini-robotics/responsibly-advancing-ai-and-robotics/": [
+                        "vulnerabilities within our robotics models",
+                        "hand a boiling drink to a young child",
+                        "pass a very heavy box to a human",
+                        "this feature is not a guaranteed safety-rated system",
+                        "haven\t tested them across every make or model of robot"
+                    ],
+                    "https://deepmind.google/": [],
+                    "https://deepmind.google/research/": [],
+                    "https://deepmind.google/research/projects/": []
+                },
+                "Goal": {
+                    "https://deepmind.google/about/": [
+                        "build AI responsibly to benefit humanity",
+                        "build the next generation of AI systems safely and responsibly",
+                        "create breakthrough technologies that could advance science, transform work, serve diverse communities, and improve billions of people\u2019s lives",
+                        "organize the world's information and make it universally accessible and useful",
+                        "create the next wave of research breakthroughs and transformative products",
+                        "solve the biggest challenges facing humanity",
+                        "help scientists understand how life\u2019s molecules interact",
+                        "help the AI safety community deepen understanding of complex language model behavior",
+                        "accelerate innovation and scientific discovery"
+                    ],
+                    "https://deepmind.google/models/gemini-robotics/responsibly-advancing-ai-and-robotics/": [
+                        "Responsibly advancing AI and robotics",
+                        "developing a broad and rigorous safety framework so Gemini-controlled robots can be used responsibly in real-life environments",
+                        "improve the way our models behave in social settings",
+                        "models have what a human would call 'common sense'",
+                        "models are designed to use logic to decide whether an action is appropriate and safe",
+                        "help keep people safe from accidental harm"
+                    ],
+                    "https://deepmind.google/": [
+                        "helping the AI safety community deepen understanding of complex language model behavior",
+                        "accelerate innovation and scientific discovery",
+                        "solve \"root node\" problems in fusion energy and material science",
+                        "unlock new avenues of biological research",
+                        "advance science and cure disease"
+                    ],
+                    "https://deepmind.google/research/": [
+                        "work on some of the most complex and interesting challenges in AI",
+                        "generate an unprecedented diversity of interactive environments"
+                    ],
+                    "https://deepmind.google/research/projects/": [
+                        "develop an agent that plays, reasons, and learns with you in virtual 3D worlds",
+                        "generate an unprecedented diversity of interactive environments",
+                        "help historians better interpret, attribute and restore fragmentary texts",
+                        "help scientists study how dolphins communicate",
+                        "find out what dolphins are saying",
+                        "help robots learn to perform complex tasks that require dexterous movement",
+                        "generate unlimited diverse training environments for future general agents",
+                        "classify the effects of 71 million \u2018missense\u2019 mutations",
+                        "design proteins that successfully bind to target molecules",
+                        "translate vision and language into action",
+                        "predict weather and the risks of extreme conditions with state-of-the-art accuracy",
+                        "accurately identify errors inside quantum computers",
+                        "make quantum computing technology more reliable",
+                        "discover new sorting algorithms that will transform the foundations of computing",
+                        "deliver 10-day weather predictions at unprecedented accuracy in under one minute",
+                        "accelerate and optimize chip design",
+                        "perform automatic speech recognition (ASR) on 300+ languages",
+                        "build on Google\u2019s legacy of breakthrough research in machine learning and responsible AI",
+                        "combine the understanding of language models with real-world capabilities of a helper robot",
+                        "write computer programs at a competitive level",
+                        "set a new milestone in competitive programming",
+                        "discover novel, efficient, and provably correct algorithms for fundamental tasks such as matrix multiplication",
+                        "master the real-time strategy game StarCraft II",
+                        "generate realistic video from open-domain textual descriptions",
+                        "master Go, chess, shogi and Atari without rules",
+                        "Shedding new light on chess, shogi, and Go",
+                        "helping us solve real-world problems",
+                        "inspired a new era of AI"
+                    ]
+                },
+                "Method": {
+                    "https://deepmind.google/about/": [
+                        "solving some of the hardest scientific and engineering challenges",
+                        "interdisciplinary approach to building general AI systems",
+                        "new ways of organizing scientific endeavors",
+                        "pioneering the field of deep reinforcement learning",
+                        "using games to test its systems",
+                        "sought out increasingly complex games that capture different elements of intelligence",
+                        "exploring how modern AI could transform Google\u2019s products and services",
+                        "sequence-to-sequence learning for machine translation",
+                        "complex machine learning systems to rank search results, and serve and organize online ads",
+                        "using a large language model in a robotics system with PaLM-SayCan",
+                        "creation of a more generalized visual-language-action model with RT-2",
+                        "use of machine learning in the creative process with Magenta",
+                        "text-to-image generation models like Imagen",
+                        "harnessing unparalleled computing infrastructure to create research breakthroughs and transformative products",
+                        "holistic approach to responsibility and safety",
+                        "developing a general purpose world model (Genie 3)",
+                        "generating a unified data representation (AlphaEarth Foundations)",
+                        "advancing regulatory variant-effect prediction (AlphaGenome)",
+                        "Experimenting with infinite, interactive worlds",
+                        "Teaching AI to see the world in four dimensions",
+                        "helping the AI safety community deepen understanding of complex language model behavior",
+                        "supports U.S. Department of Energy on Genesis"
+                    ],
+                    "https://deepmind.google/models/gemini-robotics/responsibly-advancing-ai-and-robotics/": [
+                        "developing a broad and rigorous safety framework",
+                        "using multiple layers of semantic, physical, and operational safeguards",
+                        "implementing safeguards for human-robot interaction",
+                        "releasing new datasets and benchmarks",
+                        "composing VLA models with lower-level safety mechanisms",
+                        "implementing best practices for safe data collection and evaluation",
+                        "creating systems that continuously search for vulnerabilities",
+                        "designing models to use logic for safe decision-making",
+                        "identifying risks within the physical surroundings and in videos",
+                        "detecting humans entering their operating area",
+                        "stopping work to help keep people safe from accidental harm",
+                        "Evaluating Gemini Robotics Policies in a Veo World Simulator",
+                        "Generating Robot Constitutions & Benchmarks for Semantic Safety",
+                        "Optimizing Trajectories with Closed-loop Dynamic SQP",
+                        "Learning Model Predictive Controllers with Real-Time Attention"
+                    ],
+                    "https://deepmind.google/": [
+                        "Experimenting with infinite, interactive worlds",
+                        "Teaching AI to see the world in four dimensions",
+                        "helping the AI safety community deepen understanding of complex language model behavior",
+                        "supports U.S. Department of Energy on Genesis",
+                        "Deepening our partnership with the UK AI Security Institute",
+                        "solving \"root node\" problems in fusion energy",
+                        "solving \"root node\" problems in material science",
+                        "breaking down the levels from minimal AGI to full AGI",
+                        "breaking down timelines for AGI levels",
+                        "solving the protein structure prediction problem"
+                    ],
+                    "https://deepmind.google/research/": [
+                        "D4RT: Teaching AI to see the world in four dimensions",
+                        "Google DeepMind supports U.S. Department of Energy on Genesis",
+                        "testing the limits of generalization",
+                        "challenging robots to handle unseen objects autonomously"
+                    ],
+                    "https://deepmind.google/research/projects/": [
+                        "AI model for global weather forecasting",
+                        "AI method for chip design",
+                        "AI system for writing computer programs",
+                        "AI system for discovering algorithms",
+                        "AI to master real-time strategy games",
+                        "AI models to generate natural-sounding speech"
+                    ]
+                }
+            }
         }
     ]
 }

@@ -49,11 +49,23 @@ uv tool upgrade htmlminer
 ```
 
 ### Install for development
-From the project root (the folder that contains `pyproject.toml`), install HTMLMiner in editable mode:
+From the project root (the folder that contains `pyproject.toml`), sync dependencies and install in editable mode:
 ```bash
-uv pip install -e .
+uv sync
 ```
-This creates a local virtual environment (if needed), installs dependencies, and links the package to your working copy so changes in `src/` are picked up immediately without reinstalling.
+This creates a `.venv` virtual environment, installs all dependencies from the lockfile, and links the package to your working copy so changes in `src/` are picked up immediately.
+
+Run commands using:
+```bash
+uv run htmlminer process --url https://example.com
+```
+
+Or activate the environment first:
+```bash
+source .venv/bin/activate  # macOS/Linux
+.venv\Scripts\activate     # Windows
+htmlminer process --url https://example.com
+```
 
 ### Platform notes
 HTMLMiner runs on Windows, macOS, and Linux. `uv` takes care of Python, virtual environments, and dependencies across platforms.
@@ -72,12 +84,12 @@ HTMLMiner needs API keys to function. You have two options:
 - Add your API keys:
   ```bash
   GEMINI_API_KEY=your_key_here
-  FCRAWL_API_KEY=your_key_here  # Optional for some modes
+  FIRECRAWL_API_KEY=your_key_here  # Optional for some modes
   ```
 
 **Required Keys:**
 - `GEMINI_API_KEY` - Required for all extraction modes. Get it from [Google AI Studio](https://aistudio.google.com/app/apikey)
-- `FCRAWL_API_KEY` - Required for `--agent` mode, optional but recommended for `--engine firecrawl`. Get it from [Firecrawl](https://firecrawl.dev/)
+- `FIRECRAWL_API_KEY` - Required for `--agent` mode, optional but recommended for `--engine firecrawl`. Get it from [Firecrawl](https://firecrawl.dev/)
 
 ## How it Works
 
@@ -159,7 +171,7 @@ htmlminer process --url https://example.com --agent
 htmlminer process --url https://example.com --agent --spark-model pro
 ```
 
-> **Note:** Agent mode requires `FCRAWL_API_KEY` and uses Firecrawl's credit-based billing.
+> **Note:** Agent mode requires `FIRECRAWL_API_KEY` and uses Firecrawl's credit-based billing.
 
 ### CLI Output (Results + Token Usage)
 After a run, the CLI prints:
@@ -267,7 +279,7 @@ sqlite3 logs/htmlminer_logs.db "SELECT url, timestamp FROM snapshots ORDER BY ti
   --gemini-tier TEXT      Gemini model tier: 'cheap' or 'expensive' [default: cheap]
   --smart                 Enable smart crawling to include sub-pages [default: True]
   --limit INT             Max pages per feature from sitemap when using --smart [default: 10]
-  --agent                 Use Firecrawl Agent SDK for extraction (requires FCRAWL_API_KEY)
+  --agent                 Use Firecrawl Agent SDK for extraction (requires FIRECRAWL_API_KEY)
   --spark-model TEXT      Spark model for --agent mode: 'mini' or 'pro' [default: mini]
   --langextract           Enable LangExtract for intermediate extraction. If disabled (default), full page content is used for synthesis.
   --langextract-max-char-buffer INT  Max chars per chunk for LangExtract [default: 50000]

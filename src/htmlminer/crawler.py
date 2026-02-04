@@ -1,21 +1,25 @@
 import trafilatura
 import os
+import datetime
+import time
+import json
+import gzip
+import xml.etree.ElementTree as ET
+import urllib.request
+from typing import Callable, Optional
+from urllib.parse import urlparse, urljoin
+
 from firecrawl import FirecrawlApp
 from rich.console import Console
 import requests
 
-from .database import log_event, save_snapshot
+from .database import log_event, save_snapshot, get_latest_snapshot
 
 console = Console()
 
-from urllib.parse import urlparse, urljoin
+# Cache TTL: 24 hours
+CACHE_TTL_SECONDS = 24 * 60 * 60
 
-import time
-from typing import Callable, Optional
-import urllib.request
-import json
-import xml.etree.ElementTree as ET
-import gzip
 
 def crawl_domain(
     url: str, 
@@ -42,10 +46,10 @@ def crawl_domain(
     step_timeout_s = step_timeout_s if step_timeout_s and step_timeout_s > 0 else 600
     
     if engine == "firecrawl":
-        api_key = os.getenv("FCRAWL_API_KEY")
+        api_key = os.getenv("FIRECRAWL_API_KEY")
         if not api_key:
             console.print("[red]Error:[/red] FIRECRAWL_API_KEY environment variable not set.")
-            raise Exception("FCRAWL_API_KEY environment variable not set.")
+            raise Exception("FIRECRAWL_API_KEY environment variable not set.")
             
         try:
             app = FirecrawlApp(api_key=api_key)
@@ -321,6 +325,29 @@ def fetch_firecrawl_map_urls(
         return []
 
 
+def _get_cached_content(url: str) -> Optional[str]:
+    """
+    Check if we have a cached snapshot for this URL that's less than 24 hours old.
+    Checks both 'firecrawl' and 'trafilatura' engines.
+    Returns the content if found and fresh, None otherwise.
+    """
+    for engine in ["firecrawl", "trafilatura"]:
+        snapshot = get_latest_snapshot(url, engine)
+        if snapshot:
+            content, timestamp_str = snapshot
+            if content and timestamp_str:
+                try:
+                    # Parse timestamp (format: YYYY-MM-DD HH:MM:SS)
+                    snapshot_time = datetime.datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                    age_seconds = (datetime.datetime.now() - snapshot_time).total_seconds()
+                    if age_seconds < CACHE_TTL_SECONDS:
+                        return content
+                except (ValueError, TypeError):
+                    # Can't parse timestamp, skip this cache entry
+                    pass
+    return None
+
+
 def _scrape_url_with_requests(page_url: str, api_key: str, timeout_s: int = 60) -> Optional[str]:
     """
     Scrape a single URL using direct requests to Firecrawl API (bypasses SDK).
@@ -410,7 +437,7 @@ def scrape_firecrawl_urls(
     If fallback_to_trafilatura is True, failed URLs will be retried with trafilatura.
     """
     if not api_key:
-        raise Exception("FCRAWL_API_KEY environment variable not set.")
+        raise Exception("FIRECRAWL_API_KEY environment variable not set.")
 
     results: list[tuple[str, str]] = []
     failed_urls: list[str] = []
@@ -418,6 +445,7 @@ def scrape_firecrawl_urls(
     step_timeout_s = step_timeout_s if step_timeout_s and step_timeout_s > 0 else 600
     start_ts = time.monotonic()
 
+    cached_count = 0
     for idx, page_url in enumerate(urls, start=1):
         if step_timeout_s and (time.monotonic() - start_ts) > step_timeout_s:
             if session_id:
@@ -429,6 +457,16 @@ def scrape_firecrawl_urls(
                     {"completed": idx - 1, "total": total},
                 )
             break
+        
+        # Check cache first (any engine - firecrawl or trafilatura)
+        cached = _get_cached_content(page_url)
+        if cached:
+            cached_count += 1
+            results.append((page_url, cached))
+            if progress_callback:
+                progress_callback(idx, total)
+            continue
+        
         if status_callback:
             status_callback(f"Scraping {idx}/{total}: {page_url}")
         
@@ -450,6 +488,9 @@ def scrape_firecrawl_urls(
                     "WARNING",
                     f"Failed to scrape {page_url} with firecrawl",
                 )
+    
+    if cached_count > 0:
+        console.print(f"[cyan]ℹ[/cyan] Used {cached_count} cached page(s) from database (< 24h old)")
 
     # Fallback to trafilatura for failed URLs
     if failed_urls and fallback_to_trafilatura:
