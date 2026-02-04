@@ -69,7 +69,7 @@ def save_summary_csv(results: List[Dict], output_file: str, show_full_path: bool
             count = res.get(f"{feature}_Count", 0)
             if count > 0:
                 counts.append(f"{feature}: {count}")
-        row["Counts"] = ", ".join(counts) if counts else "0"
+        row["Counts"] = ", ".join(counts) if counts else "Synthesized"
 
         csv_data.append(row)
 
@@ -138,7 +138,7 @@ def display_results(results: List[Dict]):
                 if count > 0:
                     counts.append(f"{key}: {count}")
 
-        counts_str = ", ".join(counts) if counts else "0"
+        counts_str = ", ".join(counts) if counts else "Synthesized"
         row_values.append(counts_str)
 
         table.add_row(*row_values)
