@@ -479,9 +479,13 @@ def scrape_pages_node(state: HTMLMinerState) -> dict:
     # Build warnings for CLI display
     scrape_warnings = []
     if failed_urls:
-        scrape_warnings.append(f"Failed to retrieve content from {len(failed_urls)} page(s): {', '.join(failed_urls[:3])}{'...' if len(failed_urls) > 3 else ''}")
+        warning_msg = f"Failed to retrieve content from {len(failed_urls)} page(s): {', '.join(failed_urls[:3])}{'...' if len(failed_urls) > 3 else ''}"
+        scrape_warnings.append(warning_msg)
+        console.print(f"[yellow]Warning:[/yellow] {warning_msg}")
     if not scraped:
-        scrape_warnings.append("No page content was retrieved. The site may be blocking scrapers or returning empty responses.")
+        error_msg = "No page content was retrieved. The site may be blocking scrapers or returning empty responses."
+        scrape_warnings.append(error_msg)
+        console.print(f"[red]Error:[/red] {error_msg}")
         log_event(session_id, "graph", "ERROR", "Scraping returned no content for any selected pages", {"failed_urls": failed_urls})
 
     return {"scraped_pages": scraped, "scrape_warnings": scrape_warnings}

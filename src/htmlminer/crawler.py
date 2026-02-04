@@ -1,8 +1,11 @@
 import trafilatura
 import os
 from firecrawl import FirecrawlApp
+from rich.console import Console
 
 from .database import log_event, save_snapshot
+
+console = Console()
 
 from urllib.parse import urlparse, urljoin
 
@@ -40,6 +43,7 @@ def crawl_domain(
     if engine == "firecrawl":
         api_key = os.getenv("FCRAWL_API_KEY")
         if not api_key:
+            console.print("[red]Error:[/red] FIRECRAWL_API_KEY environment variable not set.")
             raise Exception("FCRAWL_API_KEY environment variable not set.")
             
         try:
@@ -57,8 +61,12 @@ def crawl_domain(
 
                 if scrape_result and hasattr(scrape_result, 'markdown'):
                     content = scrape_result.markdown
+                    if not content:
+                        console.print(f"[yellow]Warning:[/yellow] Firecrawl returned empty content for {url}")
                     save_snapshot(url, engine, content)
                     results.append((url, content))
+                else:
+                    console.print(f"[yellow]Warning:[/yellow] Firecrawl returned no markdown for {url}")
             else:
                 # Crawl mode - Async
                 if session_id:
@@ -172,8 +180,12 @@ def crawl_domain(
                         if content:
                             save_snapshot(p_url, engine, content)
                             results.append((p_url, content))
+                
+                if not results:
+                    console.print(f"[yellow]Warning:[/yellow] Firecrawl crawl returned no content for {url}")
                             
         except Exception as e:
+             console.print(f"[red]Firecrawl error:[/red] {e}")
              raise Exception(f"Firecrawl error: {e}")
 
     elif engine == "trafilatura":
@@ -237,6 +249,7 @@ def fetch_firecrawl_map_urls(
     Fetches URLs using Firecrawl's /v2/map endpoint.
     """
     if not api_key:
+        console.print("[yellow]Warning:[/yellow] No Firecrawl API key provided for map endpoint")
         return []
     try:
         payload = {
@@ -265,8 +278,24 @@ def fetch_firecrawl_map_urls(
                 url = item.get("url") or item.get("link")
                 if url:
                     links.append(url)
+        if not links:
+            console.print(f"[yellow]Warning:[/yellow] Firecrawl map returned no URLs for {site_url}")
         return links
-    except Exception:
+    except urllib.error.HTTPError as e:
+        error_body = ""
+        try:
+            error_body = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+        console.print(f"[red]Firecrawl API error ({e.code}):[/red] {e.reason}")
+        if error_body:
+            console.print(f"[dim]{error_body[:500]}[/dim]")
+        return []
+    except urllib.error.URLError as e:
+        console.print(f"[red]Firecrawl connection error:[/red] {e.reason}")
+        return []
+    except Exception as e:
+        console.print(f"[red]Firecrawl map error:[/red] {e}")
         return []
 
 
@@ -317,7 +346,10 @@ def scrape_firecrawl_urls(
             if content:
                 save_snapshot(page_url, "firecrawl", content)
                 results.append((page_url, content))
+            else:
+                console.print(f"[yellow]Warning:[/yellow] Firecrawl returned empty content for {page_url}")
         except Exception as exc:
+            console.print(f"[red]Firecrawl scrape failed for {page_url}:[/red] {exc}")
             if session_id:
                 log_event(
                     session_id,
@@ -328,6 +360,9 @@ def scrape_firecrawl_urls(
                 )
             continue
 
+    if not results and urls:
+        console.print(f"[yellow]Warning:[/yellow] Firecrawl returned no content for any of the {len(urls)} URLs")
+    
     return results
 
 
