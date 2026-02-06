@@ -43,7 +43,7 @@ def crawl_domain(
         progress_callback: Optional callback for progress updates (completed, total).
     """
     results = []
-    step_timeout_s = step_timeout_s if step_timeout_s and step_timeout_s > 0 else 600
+    step_timeout_s = step_timeout_s if step_timeout_s and step_timeout_s > 0 else 1200
     
     if engine == "firecrawl":
         api_key = os.getenv("FIRECRAWL_API_KEY")
@@ -442,7 +442,7 @@ def scrape_firecrawl_urls(
     results: list[tuple[str, str]] = []
     failed_urls: list[str] = []
     total = len(urls)
-    step_timeout_s = step_timeout_s if step_timeout_s and step_timeout_s > 0 else 600
+    step_timeout_s = step_timeout_s if step_timeout_s and step_timeout_s > 0 else 1200
     start_ts = time.monotonic()
 
     cached_count = 0

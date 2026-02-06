@@ -46,7 +46,7 @@ console = Console()
 _GITHUB_API_BASE = "https://api.github.com/repos/andreifoldes/htmlminer"
 _VERSION_CACHE_PATH = Path("logs") / "version_check.json"
 _VERSION_CHECK_INTERVAL = timedelta(hours=24)
-STEP_TIMEOUT_S = 600
+STEP_TIMEOUT_S = 1200
 
 def _check_windows_compatibility():
     """
@@ -297,14 +297,14 @@ def process(
     config: Annotated[Optional[str], typer.Option(help="Path to config.json with feature definitions")] = None,
     engine: Annotated[str, typer.Option(help="Engine to use: 'firecrawl' (default) or 'trafilatura'. For Firecrawl, set FIRECRAWL_API_KEY in .env for best results.")] = "firecrawl",
     synthesis_top: Annotated[int, typer.Option(help="Max longest snippets per feature to send to synthesis")] = 50,
-    llm_timeout: Annotated[int, typer.Option(help="Timeout in seconds for LLM requests (Gemini/DSpy), capped at 600.")] = STEP_TIMEOUT_S,
+    llm_timeout: Annotated[int, typer.Option(help=f"Timeout in seconds for LLM requests (Gemini/DSpy), capped at {STEP_TIMEOUT_S}.")] = STEP_TIMEOUT_S,
     gemini_tier: Annotated[str, typer.Option(help="Gemini model tier: 'cheap' or 'expensive'.")] = "cheap",
     smart: Annotated[bool, typer.Option(help="Enable smart crawling to discover and analyze sub-pages (e.g. /about, /research).")] = True,
     limit: Annotated[int, typer.Option(help="Max pages per feature to select from the sitemap when using --smart. Default 10.")] = 10,
     agent: Annotated[bool, typer.Option(help="Use Firecrawl Agent SDK for extraction (requires FIRECRAWL_API_KEY).")] = False,
     spark_model: Annotated[str, typer.Option(help="Spark model for --agent mode: 'mini' (default) or 'pro'.")] = "mini",
     langextract: Annotated[bool, typer.Option(help="Enable LangExtract for intermediate extraction. If disabled (default), full page content is used for synthesis.")] = False,
-    langextract_max_char_buffer: Annotated[int, typer.Option(help="Max chars per chunk for LangExtract; smaller values prevent API hangs but increase API calls.")] = 5000,
+    langextract_max_char_buffer: Annotated[int, typer.Option(help="Max chars per chunk for LangExtract; larger values reduce API calls but may increase per-call latency.")] = 20000,
     gemini_api_key: Annotated[Optional[str], typer.Option(help="Gemini API key (overrides GEMINI_API_KEY env var)")] = None,
     firecrawl_api_key: Annotated[Optional[str], typer.Option(help="Firecrawl API key (overrides FIRECRAWL_API_KEY env var)")] = None,
 ):
@@ -588,7 +588,7 @@ def process(
                     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                         future = executor.submit(_run_workflow)
                         try:
-                            # Use step_timeout (10 mins) as the hard limit for the whole process per URL
+                            # Use step_timeout as the hard limit for the whole process per URL
                             final_state = future.result(timeout=STEP_TIMEOUT_S)
                         except concurrent.futures.TimeoutError:
                             raise TimeoutError(f"Process timed out after {STEP_TIMEOUT_S} seconds")

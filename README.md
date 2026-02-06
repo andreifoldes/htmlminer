@@ -280,13 +280,13 @@ sqlite3 logs/htmlminer_logs.db "SELECT url, timestamp FROM snapshots ORDER BY ti
   --output TEXT           Path to output file [default: results.json]
   --config TEXT           Path to config.json with feature definitions [default: ./config.json or built-in defaults]
   --engine TEXT           Engine to use: 'firecrawl' or 'trafilatura' [default: firecrawl]
-  --llm-timeout INT       Timeout in seconds for LLM requests (Gemini/DSpy), capped at 600 [default: 600]
+  --llm-timeout INT       Timeout in seconds for LLM requests (Gemini/DSpy), capped at 1200 [default: 1200]
   --gemini-tier TEXT      Gemini model tier: 'cheap' or 'expensive' [default: cheap]
   --smart                 Enable smart crawling to include sub-pages [default: True]
   --limit INT             Max pages per feature from sitemap when using --smart [default: 10]
   --agent                 Use Firecrawl Agent SDK for extraction (requires FIRECRAWL_API_KEY)
   --spark-model TEXT      Spark model for --agent mode: 'mini' or 'pro' [default: mini]
   --langextract           Enable LangExtract for intermediate extraction. If disabled (default), full page content is used for synthesis.
-  --langextract-max-char-buffer INT  Max chars per chunk for LangExtract [default: 50000]
+  --langextract-max-char-buffer INT  Max chars per chunk for LangExtract [default: 20000]
   --help                  Show this message and exit.
 ```
