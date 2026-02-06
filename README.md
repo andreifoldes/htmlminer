@@ -287,7 +287,7 @@ sqlite3 logs/htmlminer_logs.db "SELECT url, timestamp FROM snapshots ORDER BY ti
   --agent                 Use Firecrawl Agent SDK for extraction (requires FIRECRAWL_API_KEY)
   --spark-model TEXT      Spark model for --agent mode: 'mini' or 'pro' [default: mini]
   --langextract           Enable LangExtract for intermediate extraction. If disabled (default), full page content is used for synthesis.
-  --langextract-fast      Enable LangExtract fast mode (single extraction call per page for all features).
+  --langextract-fast      Enable LangExtract fast mode (single extraction call per page for all features). Implies --langextract.
   --langextract-max-char-buffer INT  Max chars per chunk for LangExtract [default: 50000]
   --langextract-max-workers INT  Max parallel LangExtract workers per page [default: 1]
   --help                  Show this message and exit.

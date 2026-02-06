@@ -308,7 +308,7 @@ def process(
     agent: Annotated[bool, typer.Option(help="Use Firecrawl Agent SDK for extraction (requires FIRECRAWL_API_KEY).")] = False,
     spark_model: Annotated[str, typer.Option(help="Spark model for --agent mode: 'mini' (default) or 'pro'.")] = "mini",
     langextract: Annotated[bool, typer.Option(help="Enable LangExtract for intermediate extraction. If disabled (default), full page content is used for synthesis.")] = False,
-    langextract_fast: Annotated[bool, typer.Option(help="Enable LangExtract fast mode (single extraction call per page for all features).")] = False,
+    langextract_fast: Annotated[bool, typer.Option(help="Enable LangExtract fast mode (single extraction call per page for all features). Implies --langextract.")] = False,
     langextract_max_char_buffer: Annotated[int, typer.Option(help=f"Max chars per chunk for LangExtract; capped at {LANGEXTRACT_MAX_CHAR_BUFFER_CAP}. Larger values reduce API calls but may increase per-call latency.")] = LANGEXTRACT_MAX_CHAR_BUFFER_DEFAULT,
     langextract_max_workers: Annotated[int, typer.Option(help=f"Max parallel LangExtract workers per page (1-{LANGEXTRACT_MAX_WORKERS_CAP}). Higher values may increase rate limiting.")] = LANGEXTRACT_MAX_WORKERS_DEFAULT,
     gemini_api_key: Annotated[Optional[str], typer.Option(help="Gemini API key (overrides GEMINI_API_KEY env var)")] = None,
@@ -429,6 +429,10 @@ def process(
              f"[yellow]Note: --langextract-max-workers capped at {LANGEXTRACT_MAX_WORKERS_CAP}.[/yellow]"
          )
          langextract_max_workers = LANGEXTRACT_MAX_WORKERS_CAP
+
+    if langextract_fast and not langextract:
+         console.print("[yellow]Note: --langextract-fast enabled; implicitly enabling --langextract.[/yellow]")
+         langextract = True
 
     # Validate spark model for agent mode
     if agent:
