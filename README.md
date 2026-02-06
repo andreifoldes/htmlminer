@@ -144,10 +144,7 @@ htmlminer process --url https://openai.com/safety/ --engine firecrawl
 ```
 
 ### Controlling Summary Length
-Limit the max paragraphs per dimension (Risk, Goal, Method) in the final summary (default is 3):
-```bash
-htmlminer process --url https://anthropic.com/ --max-paragraphs 2
-```
+Set per-feature length guidance in `config.json` using the `length` field (e.g., "1 short paragraph (2-4 sentences)").
 
 ### Limiting Synthesis Context
 Cap the number of longest snippets per feature that are fed into synthesis (default is 50):
@@ -188,6 +185,9 @@ After a run, the CLI prints:
 - `name`: the label for the dimension in results
 - `description`: what the extractor should look for
 - `synthesis_topic`: how the summary for that dimension should be framed
+- `length`: optional length guidance for the model's summary
+- `output_format`: optional output style (`number`, `list`, `free_text`, `single_choice`, `multi_choice`)
+- `output_categories`: optional list of categories for `single_choice` or `multi_choice`
 
 **Config file lookup order:**
 1. `--config /path/to/custom.json` - Use a specific config file
@@ -206,17 +206,23 @@ Example configuration:
         {
             "name": "Risk",
             "description": "Any mentioned risks, dangers, or negative impacts of AI development.",
-            "synthesis_topic": "Their risk assessment (ie what risks does AI development pose)"
+            "synthesis_topic": "Their risk assessment (ie what risks does AI development pose)",
+            "length": "1 short paragraph (2-4 sentences)",
+            "output_format": "free_text"
         },
         {
             "name": "Goal",
             "description": "High-level goals, missions, or objectives (e.g., 'AI alignment' or global AI agreement).",
-            "synthesis_topic": "The goals (often pretty high-level e.g. 'AI alignment')"
+            "synthesis_topic": "The goals (often pretty high-level e.g. 'AI alignment')",
+            "length": "1 short paragraph (2-4 sentences)",
+            "output_format": "free_text"
         },
         {
             "name": "Method",
             "description": "Strategies, activities, or actions taken to achieve the goals (research, grantmaking, policy work, etc.).",
-            "synthesis_topic": "The methods used in service of the goals"
+            "synthesis_topic": "The methods used in service of the goals",
+            "length": "1 short paragraph (2-4 sentences)",
+            "output_format": "free_text"
         }
     ]
 }
@@ -231,7 +237,7 @@ Try small CLI tweaks before changing code:
 - **Smart crawling:** Use `--smart` to automatically find and include content from sub-pages (e.g., `/about`, `/research`). This vastly improves context for the agent.
 - **Feature page limit:** Use `--limit` to cap how many pages per feature are selected from the sitemap when smart crawling is enabled.
 - **Engine choice:** `--engine firecrawl` often captures richer content; `--engine trafilatura` can be cleaner for text-heavy pages.
-- **Summary depth:** increase `--max-paragraphs` for more detail (or reduce it for faster, tighter outputs).
+- **Summary length:** set per-feature `length` in `config.json` to guide how long each summary should be.
 - **Input scope:** use `--file` with a curated URL list to avoid low-signal pages.
 
 ### Page Relevance Scores
@@ -274,7 +280,6 @@ sqlite3 logs/htmlminer_logs.db "SELECT url, timestamp FROM snapshots ORDER BY ti
   --output TEXT           Path to output file [default: results.json]
   --config TEXT           Path to config.json with feature definitions [default: ./config.json or built-in defaults]
   --engine TEXT           Engine to use: 'firecrawl' or 'trafilatura' [default: firecrawl]
-  --max-paragraphs INT    Max paragraphs per dimension in agentic summary [default: 3]
   --llm-timeout INT       Timeout in seconds for LLM requests (Gemini/DSpy), capped at 600 [default: 600]
   --gemini-tier TEXT      Gemini model tier: 'cheap' or 'expensive' [default: cheap]
   --smart                 Enable smart crawling to include sub-pages [default: True]

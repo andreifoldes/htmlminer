@@ -1,13 +1,27 @@
+import os
+import sys
 import unittest
 from unittest import mock
 from pydantic import BaseModel
 
-from htmlminer.firecrawl_agent import (
-    FirecrawlAgentExtractor,
-    SPARK_MODELS,
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+
+try:
+    from htmlminer.firecrawl_agent import (
+        FirecrawlAgentExtractor,
+        SPARK_MODELS,
+    )
+    _FIRECRAWL_IMPORT_ERROR = None
+except ModuleNotFoundError as exc:
+    FirecrawlAgentExtractor = None
+    SPARK_MODELS = {}
+    _FIRECRAWL_IMPORT_ERROR = exc
+
+
+@unittest.skipIf(
+    FirecrawlAgentExtractor is None,
+    f"Dependency missing for Firecrawl agent tests: {_FIRECRAWL_IMPORT_ERROR}",
 )
-
-
 class TestSparkModels(unittest.TestCase):
     def test_invalid_spark_model_raises(self):
         with self.assertRaises(ValueError):
@@ -23,6 +37,10 @@ class TestSparkModels(unittest.TestCase):
             self.assertEqual(extractor.spark_model, model_key)
 
 
+@unittest.skipIf(
+    FirecrawlAgentExtractor is None,
+    f"Dependency missing for Firecrawl agent tests: {_FIRECRAWL_IMPORT_ERROR}",
+)
 class TestBuildSchemaFromConfig(unittest.TestCase):
     def test_build_schema_creates_model_with_fields(self):
         with mock.patch("htmlminer.firecrawl_agent.FirecrawlApp"):
@@ -48,7 +66,12 @@ class TestBuildSchemaFromConfig(unittest.TestCase):
             extractor = FirecrawlAgentExtractor(api_key="test-key")
 
         features = [
-            {"name": "Risk", "description": "Risk description"},
+            {
+                "name": "Risk",
+                "description": "Risk description",
+                "output_format": "single_choice",
+                "output_categories": ["Low", "Medium", "High"],
+            },
         ]
 
         prompt = extractor.build_prompt_from_config("https://example.com", features)
@@ -56,8 +79,14 @@ class TestBuildSchemaFromConfig(unittest.TestCase):
         self.assertIn("https://example.com", prompt)
         self.assertIn("Risk", prompt)
         self.assertIn("Risk description", prompt)
+        self.assertIn("Output format: single_choice", prompt)
+        self.assertIn("Categories: Low, Medium, High", prompt)
 
 
+@unittest.skipIf(
+    FirecrawlAgentExtractor is None,
+    f"Dependency missing for Firecrawl agent tests: {_FIRECRAWL_IMPORT_ERROR}",
+)
 class TestFirecrawlAgentRun(unittest.TestCase):
     def test_run_calls_agent_api(self):
         mock_app = mock.MagicMock()

@@ -42,7 +42,6 @@ class HTMLMinerState(TypedDict, total=False):
     firecrawl_api_key: Optional[str]  # Firecrawl API key
     model_tier: str  # 'cheap' or 'expensive'
     model_tier: str  # 'cheap' or 'expensive'
-    max_paragraphs: int  # Max paragraphs per feature in synthesis
     use_langextract: bool  # Whether to use langextract for intermediate extraction
     langextract_max_char_buffer: int  # Max chars per chunk for LangExtract
     synthesis_top: int  # Max snippets per feature for synthesis
@@ -89,4 +88,3 @@ MODEL_TIERS = {
         "langextract_model_id": "gemini-2.5-pro",
     },
 }
-

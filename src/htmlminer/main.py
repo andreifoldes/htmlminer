@@ -296,7 +296,6 @@ def process(
     output: Annotated[str, typer.Option(help="Path to output file (e.g. results.json or results.csv)")] = "results.json",
     config: Annotated[Optional[str], typer.Option(help="Path to config.json with feature definitions")] = None,
     engine: Annotated[str, typer.Option(help="Engine to use: 'firecrawl' (default) or 'trafilatura'. For Firecrawl, set FIRECRAWL_API_KEY in .env for best results.")] = "firecrawl",
-    max_paragraphs: Annotated[int, typer.Option(help="Max paragraphs per dimension in agentic summary")] = 3,
     synthesis_top: Annotated[int, typer.Option(help="Max longest snippets per feature to send to synthesis")] = 50,
     llm_timeout: Annotated[int, typer.Option(help="Timeout in seconds for LLM requests (Gemini/DSpy), capped at 600.")] = STEP_TIMEOUT_S,
     gemini_tier: Annotated[str, typer.Option(help="Gemini model tier: 'cheap' or 'expensive'.")] = "cheap",
@@ -450,17 +449,23 @@ def process(
         {
             "name": "Risk",
             "description": "Any mentioned risks, dangers, or negative impacts of AI development.",
-            "synthesis_topic": "Their risk assessment (ie what risks does AI development pose)"
+            "synthesis_topic": "Their risk assessment (ie what risks does AI development pose)",
+            "length": "1 short paragraph (2-4 sentences)",
+            "output_format": "free_text"
         },
         {
             "name": "Goal",
             "description": "High-level goals, missions, or objectives (e.g., 'AI alignment' or global AI agreement).",
-            "synthesis_topic": "The goals (often pretty high-level e.g. 'AI alignment')"
+            "synthesis_topic": "The goals (often pretty high-level e.g. 'AI alignment')",
+            "length": "1 short paragraph (2-4 sentences)",
+            "output_format": "free_text"
         },
         {
             "name": "Method",
             "description": "Strategies, activities, or actions taken to achieve the goals (research, grantmaking, policy work, etc.).",
-            "synthesis_topic": "The methods used in service of the goals"
+            "synthesis_topic": "The methods used in service of the goals",
+            "length": "1 short paragraph (2-4 sentences)",
+            "output_format": "free_text"
         }
     ]
     
@@ -572,7 +577,6 @@ def process(
                             smart_mode=smart,
                             limit=limit,
                             model_tier=gemini_tier,
-                            max_paragraphs=max_paragraphs,
                             session_id=session_id,
                             status_callback=update_workflow_status,
                             use_langextract=langextract,
@@ -640,7 +644,6 @@ def process(
             "engine": engine,
             "smart": smart,
             "limit": limit,
-            "max_paragraphs": max_paragraphs,
             "gemini_tier": gemini_tier if not agent else None,
             "agent_mode": agent,
             "spark_model": spark_model if agent else None,

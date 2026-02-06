@@ -1,7 +1,7 @@
 {
     "metadata": {
-        "timestamp": "2026-02-04T20:23:30.544281",
-        "session_id": "d933b220-ee9f-49d2-8130-f4c4734ebe33",
+        "timestamp": "2026-02-04T20:28:18.345041",
+        "session_id": "c424c8d9-dc5d-4e85-9f17-1f7226be7a4d",
         "sitemaps": {
             "https://deepmind.google/about/": [
                 "https://deepmind.google/",
@@ -559,12 +559,12 @@
             "URL": "https://deepmind.google/about/",
             "Counts": {
                 "Risk": 5,
-                "Goal": 50,
-                "Method": 57
+                "Goal": 54,
+                "Method": 60
             },
-            "Risk": "The organization acknowledges several risks associated with its AI development, particularly in robotics. A primary concern is that their models have not been tested across every make or model of robot, indicating potential compatibility or performance issues in diverse environments. Furthermore, the developed features are explicitly stated not to be guaranteed safety-rated systems, highlighting a limitation in their current safety assurances. The organization also recognizes the existence of vulnerabilities within its robotics models, which could lead to unintended or harmful behaviors. Specific examples of potential risks include a robot inadvertently handing a boiling drink to a young child or passing a very heavy box to a human, underscoring the need for robust safety measures and extensive testing to prevent such incidents.",
-            "Goal": "DeepMind's primary goals center on responsibly advancing AI and robotics to benefit humanity. A core focus is establishing a rigorous safety framework for AI systems, particularly for Gemini-controlled robots, ensuring they operate with logic, common sense, and appropriate behavior in real-life and social environments. This commitment extends to building the next generation of AI systems safely, preventing accidental harm, and enhancing the AI safety community's understanding of complex language model behavior.\n\nThe organization aims to create breakthrough technologies that accelerate innovation and scientific discovery, tackling complex challenges across various domains. This includes discovering novel, efficient algorithms for computing, improving weather prediction accuracy, designing proteins, and solving problems in fusion energy and material science. They also develop advanced AI agents for virtual worlds, master complex games, and enable robots to perform dexterous tasks and translate vision and language into action.\n\nUltimately, DeepMind seeks to transform work, serve diverse communities, and improve billions of people's lives by making AI universally accessible and useful. Their efforts are directed towards building AI responsibly to solve humanity's biggest challenges, from helping historians interpret texts and scientists understand molecular interactions to enabling automatic speech recognition across hundreds of languages and generating realistic video.",
-            "Method": "DeepMind pursues its goals by pioneering deep reinforcement learning and an interdisciplinary approach to building general AI systems, leveraging unparalleled computing infrastructure to achieve research breakthroughs and transformative products. They focus on solving complex scientific and engineering challenges, exploring increasingly complex games to capture different elements of intelligence, and developing general-purpose world models like Genie 3. The organization also supports initiatives like the U.S. Department of Energy on Genesis and partners with the UK AI Security Institute. \n\nTheir methods involve applying complex machine learning systems to enhance Google's products, such as ranking search results and organizing online ads. Research spans diverse areas including the creation of visual-language-action models (RT-2, PaLM-SayCan), advancing regulatory variant-effect prediction (AlphaGenome), and generating unified data representations (AlphaEarth Foundations). DeepMind develops AI models for natural-sounding speech, global weather forecasting, writing computer programs, discovering algorithms, mastering real-time strategy games, and text-to-image generation (Imagen), alongside solving problems in material science and protein structure prediction.\n\nA core method involves a holistic approach to responsibility and safety, particularly in robotics. This includes developing a broad and rigorous safety framework with multiple layers of semantic, physical, and operational safeguards. They implement best practices for safe data collection and evaluation, identify risks in physical surroundings and videos, and create systems that continuously search for vulnerabilities. Specific safety measures for robotics include generating Robot Constitutions, learning Model Predictive Controllers with real-time attention, designing models for safe decision-making, optimizing trajectories, and implementing safeguards for human-robot interaction, such as detecting humans in operating areas and stopping work to prevent accidental harm. They also evaluate policies in simulators and release new datasets and benchmarks to advance the AI safety community's understanding.",
+            "Risk": "The organization identifies several risks associated with AI development, particularly concerning robotics models. A primary concern is the potential for models and associated equipment to be used unsafely or inappropriately. This includes inherent vulnerabilities within the robotics models themselves, which could lead to unintended or harmful outcomes.\n\nSpecific examples of these risks include scenarios where a robotic system might inadvertently cause harm, such as attempting to hand a boiling drink to a young child or passing a very heavy box to a human, potentially leading to injury.\n\nIt is explicitly stated that these features do not constitute a guaranteed safety-rated system, highlighting the need for careful oversight and responsible deployment to mitigate these identified risks.",
+            "Goal": "The organization's primary goal is to create breakthrough AI technologies to advance science, accelerate innovation, and ultimately transform work and improve billions of people's lives. This involves tackling complex challenges in AI research, such as discovering novel algorithms, solving fundamental scientific problems like protein structure prediction and fusion energy, and developing advanced capabilities in areas like robotics, language models, and weather prediction.\n\nThese efforts aim to deliver state-of-the-art solutions that can organize the world's information, provide accurate forecasts for extreme weather, enable robots to perform complex tasks, and assist in diverse fields from historical interpretation to chip design. The overarching objective is to apply AI to solve some of humanity's biggest challenges.\n\nCrucially, a core tenet is the responsible advancement of AI and robotics. This includes building the next generation of AI systems safely and ethically, developing rigorous safety frameworks to prevent accidental harm, and deepening the AI safety community's understanding of complex language model behaviors to ensure technology benefits humanity reliably.",
+            "Method": "DeepMind pursues its goals by pioneering deep reinforcement learning and developing general AI systems through an interdisciplinary approach. This includes creating advanced models like Gemini Robotics, RT-2 for visual-language-action, PaLM-SayCan for robotics, and Genie 3 for world modeling. They challenge AI to master complex games, handle unseen objects, discover algorithms, and generate unified data representations such as AlphaEarth Foundations. Their research extends to applications like weather forecasting, program writing, natural-sounding speech generation, and text-to-image models like Imagen. They also apply complex machine learning systems to rank search results and organize online ads. A core method involves developing a broad and rigorous safety framework for AI and robotics. This includes implementing multiple layers of semantic, physical, and operational safeguards, alongside best practices for safe data collection and evaluation. They identify risks in physical surroundings, generate Robot Constitutions for semantic safety, and design models to use logic for safe decision-making. Methods also encompass continuous vulnerability searches, real-time attention in model predictive controllers, optimizing trajectories, and composing VLA models with lower-level safety mechanisms. Crucially, they implement safeguards for human-robot interaction, detect humans in operating areas, and stop work to prevent accidental harm, evaluating policies in simulators like Veo World. They also actively help the AI safety community understand complex language model behavior and partner with institutions like the UK AI Security Institute. DeepMind leverages unparalleled computing infrastructure to achieve research breakthroughs and transformative products. They foster scientific endeavors by bringing together new ideas and advances in machine learning, releasing new datasets and benchmarks to support the broader community. They support initiatives like the U.S. Department of Energy on Genesis, and their work spans diverse applications from engineering resilient crops to transforming historical research with Aeneas.",
             "Raw_Extraction_By_Page": {
                 "Risk": {
                     "https://deepmind.google/about/": [],
@@ -573,7 +573,7 @@
                         "hand a boiling drink to a young child",
                         "pass a very heavy box to a human",
                         "this feature is not a guaranteed safety-rated system",
-                        "haven\t tested them across every make or model of robot"
+                        "risks if models (and any equipment) are not used safely and appropriately"
                     ],
                     "https://deepmind.google/": [],
                     "https://deepmind.google/research/": [],
@@ -586,44 +586,48 @@
                         "create breakthrough technologies that could advance science, transform work, serve diverse communities, and improve billions of people\u2019s lives",
                         "organize the world's information and make it universally accessible and useful",
                         "create the next wave of research breakthroughs and transformative products",
-                        "solve the biggest challenges facing humanity",
-                        "help scientists understand how life\u2019s molecules interact",
-                        "help the AI safety community deepen understanding of complex language model behavior",
+                        "helps solve the biggest challenges facing humanity",
+                        "generate an unprecedented diversity of interactive environments",
+                        "Generate a unified data representation that revolutionizes global mapping and monitoring",
+                        "Producing state-of-the-art forecasts for a world of increasingly extreme weather",
+                        "Revealing millions of intricate 3D protein structures",
+                        "helping scientists understand how life\u2019s molecules interact",
+                        "helping the AI safety community deepen understanding of complex language model behavior",
                         "accelerate innovation and scientific discovery"
                     ],
                     "https://deepmind.google/models/gemini-robotics/responsibly-advancing-ai-and-robotics/": [
                         "Responsibly advancing AI and robotics",
                         "developing a broad and rigorous safety framework so Gemini-controlled robots can be used responsibly in real-life environments",
-                        "improve the way our models behave in social settings",
-                        "models have what a human would call 'common sense'",
-                        "models are designed to use logic to decide whether an action is appropriate and safe",
                         "help keep people safe from accidental harm"
                     ],
                     "https://deepmind.google/": [
                         "helping the AI safety community deepen understanding of complex language model behavior",
                         "accelerate innovation and scientific discovery",
-                        "solve \"root node\" problems in fusion energy and material science",
-                        "unlock new avenues of biological research",
-                        "advance science and cure disease"
+                        "solving \"root node\" problems in fusion energy and material science",
+                        "rise of world models and simulations",
+                        "solve the protein structure prediction problem",
+                        "unlocking new avenues of biological research",
+                        "advance science and cure disease",
+                        "generate an unprecedented diversity of interactive environments"
                     ],
                     "https://deepmind.google/research/": [
                         "work on some of the most complex and interesting challenges in AI",
                         "generate an unprecedented diversity of interactive environments"
                     ],
                     "https://deepmind.google/research/projects/": [
-                        "develop an agent that plays, reasons, and learns with you in virtual 3D worlds",
+                        "play, reason, and learn with you in virtual 3D worlds",
                         "generate an unprecedented diversity of interactive environments",
                         "help historians better interpret, attribute and restore fragmentary texts",
                         "help scientists study how dolphins communicate",
                         "find out what dolphins are saying",
                         "help robots learn to perform complex tasks that require dexterous movement",
                         "generate unlimited diverse training environments for future general agents",
-                        "classify the effects of 71 million \u2018missense\u2019 mutations",
+                        "classify the effects of 71 million 'missense' mutations",
                         "design proteins that successfully bind to target molecules",
                         "translate vision and language into action",
                         "predict weather and the risks of extreme conditions with state-of-the-art accuracy",
                         "accurately identify errors inside quantum computers",
-                        "make quantum computing technology more reliable",
+                        "make this new technology more reliable",
                         "discover new sorting algorithms that will transform the foundations of computing",
                         "deliver 10-day weather predictions at unprecedented accuracy in under one minute",
                         "accelerate and optimize chip design",
@@ -643,13 +647,12 @@
                 },
                 "Method": {
                     "https://deepmind.google/about/": [
-                        "solving some of the hardest scientific and engineering challenges",
                         "interdisciplinary approach to building general AI systems",
-                        "new ways of organizing scientific endeavors",
+                        "bringing together new ideas and advances in machine learning",
+                        "bringing together new ways of organizing scientific endeavors",
                         "pioneering the field of deep reinforcement learning",
                         "using games to test its systems",
                         "sought out increasingly complex games that capture different elements of intelligence",
-                        "exploring how modern AI could transform Google\u2019s products and services",
                         "sequence-to-sequence learning for machine translation",
                         "complex machine learning systems to rank search results, and serve and organize online ads",
                         "using a large language model in a robotics system with PaLM-SayCan",
@@ -697,11 +700,15 @@
                     ],
                     "https://deepmind.google/research/": [
                         "D4RT: Teaching AI to see the world in four dimensions",
-                        "Google DeepMind supports U.S. Department of Energy on Genesis",
+                        "supporting U.S. Department of Energy on Genesis",
+                        "Engineering more resilient crops for a warming climate",
+                        "Revealing a key protein behind heart disease",
+                        "Breeding healthier and stronger honeybees",
                         "testing the limits of generalization",
                         "challenging robots to handle unseen objects autonomously"
                     ],
                     "https://deepmind.google/research/projects/": [
+                        "Aeneas transforms how historians connect the past",
                         "AI model for global weather forecasting",
                         "AI method for chip design",
                         "AI system for writing computer programs",

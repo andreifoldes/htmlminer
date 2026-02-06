@@ -110,7 +110,6 @@ def run_htmlminer_workflow(
     smart_mode: bool = True,
     limit: int = 10,
     model_tier: str = "cheap",
-    max_paragraphs: int = 3,
     session_id: str = None,
     status_callback: callable = None,
     use_langextract: bool = False,
@@ -129,7 +128,6 @@ def run_htmlminer_workflow(
         smart_mode: Whether to use smart crawling
         limit: Max pages to select
         model_tier: 'cheap' or 'expensive'
-        max_paragraphs: Max paragraphs per feature in synthesis
         session_id: Session ID for logging
         status_callback: Callback for status updates
         use_langextract: Whether to use LangExtract for intermediate extraction
@@ -150,7 +148,6 @@ def run_htmlminer_workflow(
         "smart_mode": smart_mode,
         "limit": limit,
         "model_tier": model_tier,
-        "max_paragraphs": max_paragraphs,
         "session_id": session_id or "",
         "status_callback": status_callback,
         "use_langextract": use_langextract,

@@ -730,7 +730,6 @@ def synthesize_node(state: HTMLMinerState) -> dict:
     features = state.get("features", [])
     api_key = state.get("api_key", "")
     model_tier = state.get("model_tier", "cheap")
-    max_paragraphs = state.get("max_paragraphs", 3)
     use_langextract = state.get("use_langextract", False)
     synthesis_top = state.get("synthesis_top", 50)
     session_id = state.get("session_id", "")
@@ -783,6 +782,21 @@ def synthesize_node(state: HTMLMinerState) -> dict:
         for feature in features:
             feature_name = feature["name"]
             synthesis_topic = feature.get("synthesis_topic", feature_name)
+            length_guidance = feature.get("length", "")
+            if not isinstance(length_guidance, str):
+                length_guidance = ""
+            length_guidance = length_guidance.strip()
+            output_format = feature.get("output_format", "")
+            if not isinstance(output_format, str):
+                output_format = ""
+            output_format = output_format.strip().lower()
+            output_categories_raw = feature.get("output_categories", [])
+            if isinstance(output_categories_raw, str):
+                output_categories = [c.strip() for c in output_categories_raw.split(",") if c.strip()]
+            elif isinstance(output_categories_raw, (list, tuple)):
+                output_categories = [str(c).strip() for c in output_categories_raw if str(c).strip()]
+            else:
+                output_categories = []
             
             prompt_content = ""
             
@@ -806,10 +820,39 @@ def synthesize_node(state: HTMLMinerState) -> dict:
                 # Use full content
                 prompt_content = f"Source Content:\n{combined_content}"
 
-            prompt = f"""Synthesize the following information about "{synthesis_topic}" into a coherent summary.
-Write at most {max_paragraphs} paragraphs. Be concise and factual.
-
-{prompt_content}"""
+            prompt_lines = [
+                f'Synthesize the following information about "{synthesis_topic}" into a coherent summary.',
+                "Be concise and factual.",
+            ]
+            if length_guidance:
+                prompt_lines.append(f"Length guidance: {length_guidance}")
+            if output_format:
+                if output_format in {"number", "numeric", "integer", "float"}:
+                    prompt_lines.append("Output format: number only (no units or extra text).")
+                elif output_format in {"list", "bullet_list"}:
+                    prompt_lines.append("Output format: bullet list.")
+                elif output_format in {"free_text", "text"}:
+                    prompt_lines.append("Output format: free text.")
+                elif output_format in {"single_choice", "single_choice_category", "single"}:
+                    if output_categories:
+                        prompt_lines.append(
+                            f"Output format: single choice from categories: {', '.join(output_categories)}."
+                        )
+                    else:
+                        prompt_lines.append("Output format: single choice.")
+                elif output_format in {"multi_choice", "multiple_choice", "multi"}:
+                    if output_categories:
+                        prompt_lines.append(
+                            "Output format: multiple choices (comma-separated) from categories: "
+                            f"{', '.join(output_categories)}."
+                        )
+                    else:
+                        prompt_lines.append("Output format: multiple choices (comma-separated).")
+                else:
+                    prompt_lines.append(f"Output format: {output_format}.")
+            prompt_lines.append("")
+            prompt_lines.append(prompt_content)
+            prompt = "\n".join(prompt_lines)
 
             try:
                 result = structured_llm.invoke(

@@ -3,17 +3,23 @@
         {
             "name": "Risk",
             "description": "Any mentioned risks, dangers, or negative impacts of AI development by the organization.",
-            "synthesis_topic": "The organization's risk assessment (ie what risks does AI development pose)"
+            "synthesis_topic": "The organization's risk assessment (ie what risks does AI development pose)",
+            "length": "1 short paragraph (2-4 sentences)",
+            "output_format": "free_text"
         },
         {
             "name": "Goal",
             "description": "High-level goals, missions, or objectives (e.g., 'AI alignment' or global AI agreement).",
-            "synthesis_topic": "The goals of the organization (often pretty high-level e.g. 'AI alignment')"
+            "synthesis_topic": "The goals of the organization (often pretty high-level e.g. 'AI alignment')",
+            "length": "1 short paragraph (2-4 sentences)",
+            "output_format": "free_text"
         },
         {
             "name": "Method",
             "description": "Strategies, activities, or actions taken to achieve the goals (research, grantmaking, policy work, etc.).",
-            "synthesis_topic": "The methods used by the organization to service their,,, goals"
+            "synthesis_topic": "The methods used by the organization to service their,,, goals",
+            "length": "1 short paragraph (2-4 sentences)",
+            "output_format": "free_text"
         }
     ]
 }

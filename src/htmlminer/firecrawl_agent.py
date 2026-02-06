@@ -90,7 +90,32 @@ class FirecrawlAgentExtractor:
         for f in features:
             name = f["name"]
             desc = f.get("description", name)
-            feature_descriptions.append(f"- {name}: {desc}")
+            length_guidance = f.get("length", "")
+            if not isinstance(length_guidance, str):
+                length_guidance = ""
+            length_guidance = length_guidance.strip()
+            output_format = f.get("output_format", "")
+            if not isinstance(output_format, str):
+                output_format = ""
+            output_format = output_format.strip()
+            output_categories_raw = f.get("output_categories", [])
+            if isinstance(output_categories_raw, str):
+                output_categories = [c.strip() for c in output_categories_raw.split(",") if c.strip()]
+            elif isinstance(output_categories_raw, (list, tuple)):
+                output_categories = [str(c).strip() for c in output_categories_raw if str(c).strip()]
+            else:
+                output_categories = []
+            extras = []
+            if length_guidance:
+                extras.append(f"Length guidance: {length_guidance}")
+            if output_format:
+                extras.append(f"Output format: {output_format}")
+            if output_categories:
+                extras.append(f"Categories: {', '.join(output_categories)}")
+            if extras:
+                feature_descriptions.append(f"- {name}: {desc} ({'; '.join(extras)})")
+            else:
+                feature_descriptions.append(f"- {name}: {desc}")
         
         features_text = "\n".join(feature_descriptions)
         
