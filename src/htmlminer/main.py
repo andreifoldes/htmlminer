@@ -8,7 +8,10 @@ from datetime import datetime, timedelta, timezone
 import json
 import urllib.request
 import urllib.error
-from typing import Optional
+import csv
+import itertools
+import re
+from typing import Optional, NamedTuple
 from typing_extensions import Annotated
 from rich.console import Console
 from rich.panel import Panel
@@ -51,6 +54,351 @@ LANGEXTRACT_MAX_CHAR_BUFFER_DEFAULT = 50000
 LANGEXTRACT_MAX_CHAR_BUFFER_CAP = 200000
 LANGEXTRACT_MAX_WORKERS_DEFAULT = 1
 LANGEXTRACT_MAX_WORKERS_CAP = 10
+MAX_INVALID_URL_EXAMPLES = 5
+_URL_REGEX = re.compile(r"https?://[^\s<>'\"\\]+")
+_URL_TRAILING_PUNCT = ".,;:!?)]}\"'"
+_URL_LEADING_PUNCT = "(['\""
+_JSON_NUMBER_RE = re.compile(r"-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?")
+
+def _clean_url_candidate(candidate: str) -> str:
+    if not candidate:
+        return ""
+    cleaned = candidate.strip().strip("<>")
+    cleaned = cleaned.lstrip(_URL_LEADING_PUNCT)
+    cleaned = cleaned.rstrip(_URL_TRAILING_PUNCT)
+    return cleaned
+
+def _is_valid_url(url: str) -> bool:
+    if not url or any(ch.isspace() for ch in url):
+        return False
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return False
+    if not parsed.netloc:
+        return False
+    return True
+
+def _extract_urls_from_text(text: str) -> list[str]:
+    matches = _URL_REGEX.findall(text or "")
+    urls = []
+    for match in matches:
+        cleaned = _clean_url_candidate(match)
+        if _is_valid_url(cleaned):
+            urls.append(cleaned)
+    return urls
+
+def _looks_like_url_text(text: str) -> bool:
+    lowered = (text or "").lower()
+    return "http://" in lowered or "https://" in lowered or "www." in lowered
+
+def _is_url_header_cell(cell: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", " ", (cell or "").strip().lower())
+    tokens = {token for token in normalized.split() if token}
+    return bool(tokens & {"url", "urls", "link", "links", "website", "websites", "homepage"})
+
+def _find_url_column(header_row: list[str]) -> Optional[int]:
+    for idx, cell in enumerate(header_row):
+        if _is_url_header_cell(cell):
+            return idx
+    return None
+
+def _load_urls_from_lines(file_path: str) -> tuple[list[str], int, list[str]]:
+    urls: list[str] = []
+    invalid_count = 0
+    invalid_examples: list[str] = []
+    with open(file_path, "r", encoding="utf-8-sig") as handle:
+        for line in handle:
+            text = line.strip()
+            if not text:
+                continue
+            extracted = _extract_urls_from_text(text)
+            if extracted:
+                urls.extend(extracted)
+            elif _looks_like_url_text(text):
+                invalid_count += 1
+                if len(invalid_examples) < MAX_INVALID_URL_EXAMPLES:
+                    invalid_examples.append(text)
+    return urls, invalid_count, invalid_examples
+
+def _load_urls_from_delimited(file_path: str, delimiter: str) -> tuple[list[str], int, list[str]]:
+    urls: list[str] = []
+    invalid_count = 0
+    invalid_examples: list[str] = []
+    with open(file_path, "r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.reader(handle, delimiter=delimiter)
+        header = next(reader, None)
+        if header is None:
+            return urls, invalid_count, invalid_examples
+        url_col = _find_url_column(header)
+        rows_iter = reader if url_col is not None else itertools.chain([header], reader)
+        for row in rows_iter:
+            if not row:
+                continue
+            cells = [row[url_col]] if url_col is not None and url_col < len(row) else row
+            for cell in cells:
+                text = (cell or "").strip()
+                if not text:
+                    continue
+                extracted = _extract_urls_from_text(text)
+                if extracted:
+                    urls.extend(extracted)
+                elif _looks_like_url_text(text):
+                    invalid_count += 1
+                    if len(invalid_examples) < MAX_INVALID_URL_EXAMPLES:
+                        invalid_examples.append(text)
+    return urls, invalid_count, invalid_examples
+
+def _load_urls_from_file(file_path: str) -> tuple[list[str], int, list[str]]:
+    ext = Path(file_path).suffix.lower()
+    if ext == ".csv":
+        return _load_urls_from_delimited(file_path, ",")
+    if ext == ".tsv":
+        return _load_urls_from_delimited(file_path, "\t")
+    return _load_urls_from_lines(file_path)
+
+class _Token(NamedTuple):
+    kind: str
+    value: object
+    pos: int
+
+class _LenientJsonError(Exception):
+    def __init__(self, message: str, pos: int) -> None:
+        super().__init__(message)
+        self.pos = pos
+
+def _pos_to_line_col(text: str, pos: int) -> tuple[int, int]:
+    safe_pos = max(pos, 0)
+    line = text.count("\n", 0, safe_pos) + 1
+    last_newline = text.rfind("\n", 0, safe_pos)
+    col = safe_pos - last_newline
+    return line, col
+
+def _format_json_error(text: str, line: int, col: int, message: str, max_width: int = 140) -> str:
+    lines = text.splitlines()
+    if line < 1 or line > len(lines):
+        return f"{message} (line {line}, column {col})"
+    raw_line = lines[line - 1]
+    caret_pos = max(col - 1, 0)
+    if len(raw_line) > max_width:
+        start = max(0, caret_pos - max_width // 2)
+        end = min(len(raw_line), start + max_width)
+        prefix = "..." if start > 0 else ""
+        suffix = "..." if end < len(raw_line) else ""
+        display_line = f"{prefix}{raw_line[start:end]}{suffix}"
+        caret_pos = caret_pos - start + len(prefix)
+    else:
+        display_line = raw_line
+    caret_line = " " * caret_pos + "^"
+    return f"{message}\n{line:>4} | {display_line}\n     | {caret_line}"
+
+def _tokenize_lenient_json(text: str) -> list[_Token]:
+    tokens: list[_Token] = []
+    i = 0
+    length = len(text)
+    while i < length:
+        ch = text[i]
+        if ch.isspace():
+            i += 1
+            continue
+        if ch in "{}[]:,":
+            tokens.append(_Token(ch, ch, i))
+            i += 1
+            continue
+        if ch == '"':
+            start = i
+            i += 1
+            escaped = False
+            while i < length:
+                current = text[i]
+                if escaped:
+                    escaped = False
+                    i += 1
+                    continue
+                if current == "\\":
+                    escaped = True
+                    i += 1
+                    continue
+                if current == '"':
+                    i += 1
+                    raw = text[start:i]
+                    try:
+                        value = json.loads(raw)
+                    except json.JSONDecodeError as exc:
+                        raise _LenientJsonError(f"Invalid string literal: {exc.msg}", start) from exc
+                    tokens.append(_Token("STRING", value, start))
+                    break
+                i += 1
+            else:
+                raise _LenientJsonError("Unterminated string literal", start)
+            continue
+        if ch == "-" or ch.isdigit():
+            match = _JSON_NUMBER_RE.match(text, i)
+            if not match:
+                raise _LenientJsonError("Invalid number literal", i)
+            raw = match.group(0)
+            try:
+                value = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise _LenientJsonError("Invalid number literal", i) from exc
+            tokens.append(_Token("NUMBER", value, i))
+            i = match.end()
+            continue
+        if text.startswith("true", i):
+            tokens.append(_Token("LITERAL", True, i))
+            i += 4
+            continue
+        if text.startswith("false", i):
+            tokens.append(_Token("LITERAL", False, i))
+            i += 5
+            continue
+        if text.startswith("null", i):
+            tokens.append(_Token("LITERAL", None, i))
+            i += 4
+            continue
+        raise _LenientJsonError(f"Unexpected character {ch!r}", i)
+    return tokens
+
+def _lenient_json_loads(text: str) -> object:
+    tokens = _tokenize_lenient_json(text)
+    index = 0
+
+    def peek() -> Optional[_Token]:
+        return tokens[index] if index < len(tokens) else None
+
+    def consume(expected: Optional[str] = None) -> _Token:
+        nonlocal index
+        if index >= len(tokens):
+            raise _LenientJsonError("Unexpected end of input", len(text))
+        token = tokens[index]
+        if expected and token.kind != expected:
+            raise _LenientJsonError(f"Expected '{expected}'", token.pos)
+        index += 1
+        return token
+
+    def parse_value() -> object:
+        token = peek()
+        if token is None:
+            raise _LenientJsonError("Unexpected end of input", len(text))
+        if token.kind == "{":
+            return parse_object()
+        if token.kind == "[":
+            return parse_array()
+        if token.kind in {"STRING", "NUMBER", "LITERAL"}:
+            consume()
+            return token.value
+        raise _LenientJsonError(f"Expected value, got '{token.kind}'", token.pos)
+
+    def parse_object() -> dict:
+        consume("{")
+        obj: dict = {}
+        token = peek()
+        if token is not None and token.kind == "}":
+            consume("}")
+            return obj
+        while True:
+            token = peek()
+            if token is None:
+                raise _LenientJsonError("Unexpected end of input in object", len(text))
+            if token.kind == ",":
+                consume(",")
+                continue
+            if token.kind == "}":
+                consume("}")
+                return obj
+            if token.kind != "STRING":
+                raise _LenientJsonError("Expected string key", token.pos)
+            key = consume("STRING").value
+            token = peek()
+            if token is None:
+                raise _LenientJsonError("Expected ':' after key", len(text))
+            if token.kind != ":":
+                raise _LenientJsonError("Expected ':' after key", token.pos)
+            consume(":")
+            value = parse_value()
+            obj[key] = value
+            token = peek()
+            if token is None:
+                raise _LenientJsonError("Unexpected end of input in object", len(text))
+            if token.kind == ",":
+                consume(",")
+                token = peek()
+                if token is not None and token.kind == "}":
+                    consume("}")
+                    return obj
+                continue
+            if token.kind == "}":
+                consume("}")
+                return obj
+            if token.kind == "STRING":
+                # Missing comma between object entries.
+                continue
+            raise _LenientJsonError("Expected ',' or '}' after object entry", token.pos)
+
+    def parse_array() -> list:
+        consume("[")
+        items: list = []
+        token = peek()
+        if token is not None and token.kind == "]":
+            consume("]")
+            return items
+        while True:
+            token = peek()
+            if token is None:
+                raise _LenientJsonError("Unexpected end of input in array", len(text))
+            if token.kind == ",":
+                consume(",")
+                continue
+            if token.kind == "]":
+                consume("]")
+                return items
+            items.append(parse_value())
+            token = peek()
+            if token is None:
+                raise _LenientJsonError("Unexpected end of input in array", len(text))
+            if token.kind == ",":
+                consume(",")
+                token = peek()
+                if token is not None and token.kind == "]":
+                    consume("]")
+                    return items
+                continue
+            if token.kind == "]":
+                consume("]")
+                return items
+            if token.kind in {"STRING", "NUMBER", "LITERAL", "{", "["}:
+                # Missing comma between array entries.
+                continue
+            raise _LenientJsonError("Expected ',' or ']' after array entry", token.pos)
+
+    value = parse_value()
+    if index < len(tokens):
+        token = tokens[index]
+        raise _LenientJsonError(f"Unexpected trailing token '{token.kind}'", token.pos)
+    return value
+
+def _load_config_features(config_path: str, console: Console) -> list:
+    text = Path(config_path).read_text(encoding="utf-8")
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        try:
+            payload = _lenient_json_loads(text)
+        except _LenientJsonError as repair_exc:
+            error_line, error_col = exc.lineno, exc.colno
+            message = f"JSON error at line {error_line}, column {error_col}: {exc.msg}"
+            console.print(f"[bold red]Error:[/bold red] Failed to parse {config_path}.")
+            console.print(_format_json_error(text, error_line, error_col, message), markup=False)
+            repair_line, repair_col = _pos_to_line_col(text, repair_exc.pos)
+            repair_message = f"Repair attempt failed at line {repair_line}, column {repair_col}: {repair_exc}"
+            console.print(repair_message, style="red", markup=False)
+            raise typer.Exit(code=1)
+        console.print(f"[yellow]Warning:[/yellow] {config_path} contained malformed JSON.")
+        console.print("[yellow]Parsed with best-effort repair (missing/trailing commas). Please fix the file.[/yellow]")
+        console.print(f"[dim]Original JSON error: line {exc.lineno}, column {exc.colno}: {exc.msg}[/dim]")
+    if not isinstance(payload, dict):
+        console.print(f"[bold red]Error:[/bold red] Config file must contain a JSON object: {config_path}")
+        raise typer.Exit(code=1)
+    return payload.get("features", [])
 
 def _check_windows_compatibility():
     """
@@ -295,7 +643,7 @@ def reset_env(
 
 @app.command()
 def process(
-    file: Annotated[Optional[str], typer.Option(help="Path to markdown file containing URLs")] = None,
+    file: Annotated[Optional[str], typer.Option(help="Path to file containing URLs (.md, .txt, .csv, .tsv)")] = None,
     url: Annotated[Optional[str], typer.Option(help="Single URL to process")] = None,
     output: Annotated[str, typer.Option(help="Path to output file (e.g. results.json or results.csv)")] = "results.json",
     config: Annotated[Optional[str], typer.Option(help="Path to config.json with feature definitions")] = None,
@@ -372,12 +720,34 @@ def process(
             console.print(f"[bold red]Error:[/bold red] {msg}")
             log_event(session_id, "cli", "ERROR", msg)
             raise typer.Exit(code=1)
-        
-        with open(file, 'r') as f:
-            urls.extend([line.strip() for line in f if line.strip()])
+
+        file_urls, invalid_count, invalid_examples = _load_urls_from_file(file)
+        urls.extend(file_urls)
+        if invalid_count:
+            examples = ""
+            if invalid_examples:
+                examples = f" Examples: {', '.join(invalid_examples)}"
+            msg = (
+                f"Skipped {invalid_count} invalid URL entr"
+                f"{'y' if invalid_count == 1 else 'ies'} from {file}."
+                f"{examples}"
+            )
+            console.print(f"[yellow]{msg}[/yellow]")
+            log_event(session_id, "cli", "WARN", msg)
 
     if url:
+        if not _is_valid_url(url):
+            msg = f"Invalid --url value: {url}. URL must start with http:// or https://"
+            console.print(f"[bold red]Error:[/bold red] {msg}")
+            log_event(session_id, "cli", "ERROR", msg)
+            raise typer.Exit(code=1)
         urls.append(url)
+
+    if not urls:
+        msg = "No valid URLs found. Provide at least one valid URL via --file or --url."
+        console.print(f"[bold red]Error:[/bold red] {msg}")
+        log_event(session_id, "cli", "ERROR", msg)
+        raise typer.Exit(code=1)
 
     # Check for Gemini API key (required for all modes except pure firecrawl crawling)
     # Priority: CLI flag > env var > prompt
@@ -483,8 +853,6 @@ def process(
     if firecrawl_api_key:
         console.print(f"[dim]Firecrawl API Key:[/dim] {_mask_key(firecrawl_api_key)}")
 
-    import json
-    
     # Default features if config.json is not found
     DEFAULT_FEATURES = [
         {
@@ -520,14 +888,9 @@ def process(
         raise typer.Exit(code=1)
     
     if os.path.exists(config_path):
-        with open(config_path, 'r') as f:
-            try:
-                extraction_config = json.load(f).get("features", [])
-                if config:
-                    console.print(f"[dim]Using config: {config_path}[/dim]")
-            except json.JSONDecodeError:
-                console.print(f"[bold red]Error:[/bold red] Failed to parse {config_path}.")
-                raise typer.Exit(code=1)
+        extraction_config = _load_config_features(config_path, console)
+        if config:
+            console.print(f"[dim]Using config: {config_path}[/dim]")
     else:
         # Use default features when config.json is not found
         extraction_config = DEFAULT_FEATURES
