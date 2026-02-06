@@ -47,6 +47,10 @@ _GITHUB_API_BASE = "https://api.github.com/repos/andreifoldes/htmlminer"
 _VERSION_CACHE_PATH = Path("logs") / "version_check.json"
 _VERSION_CHECK_INTERVAL = timedelta(hours=24)
 STEP_TIMEOUT_S = 1200
+LANGEXTRACT_MAX_CHAR_BUFFER_DEFAULT = 50000
+LANGEXTRACT_MAX_CHAR_BUFFER_CAP = 200000
+LANGEXTRACT_MAX_WORKERS_DEFAULT = 1
+LANGEXTRACT_MAX_WORKERS_CAP = 10
 
 def _check_windows_compatibility():
     """
@@ -304,7 +308,9 @@ def process(
     agent: Annotated[bool, typer.Option(help="Use Firecrawl Agent SDK for extraction (requires FIRECRAWL_API_KEY).")] = False,
     spark_model: Annotated[str, typer.Option(help="Spark model for --agent mode: 'mini' (default) or 'pro'.")] = "mini",
     langextract: Annotated[bool, typer.Option(help="Enable LangExtract for intermediate extraction. If disabled (default), full page content is used for synthesis.")] = False,
-    langextract_max_char_buffer: Annotated[int, typer.Option(help="Max chars per chunk for LangExtract; larger values reduce API calls but may increase per-call latency.")] = 20000,
+    langextract_fast: Annotated[bool, typer.Option(help="Enable LangExtract fast mode (single extraction call per page for all features).")] = False,
+    langextract_max_char_buffer: Annotated[int, typer.Option(help=f"Max chars per chunk for LangExtract; capped at {LANGEXTRACT_MAX_CHAR_BUFFER_CAP}. Larger values reduce API calls but may increase per-call latency.")] = LANGEXTRACT_MAX_CHAR_BUFFER_DEFAULT,
+    langextract_max_workers: Annotated[int, typer.Option(help=f"Max parallel LangExtract workers per page (1-{LANGEXTRACT_MAX_WORKERS_CAP}). Higher values may increase rate limiting.")] = LANGEXTRACT_MAX_WORKERS_DEFAULT,
     gemini_api_key: Annotated[Optional[str], typer.Option(help="Gemini API key (overrides GEMINI_API_KEY env var)")] = None,
     firecrawl_api_key: Annotated[Optional[str], typer.Option(help="Firecrawl API key (overrides FIRECRAWL_API_KEY env var)")] = None,
 ):
@@ -330,7 +336,22 @@ def process(
         "cli",
         "INFO",
         "Started process command",
-        {"file": file, "url": url, "engine": engine, "gemini_tier": gemini_tier, "smart": smart, "limit": limit, "agent": agent, "spark_model": spark_model, "synthesis_top": synthesis_top, "llm_timeout": effective_llm_timeout, "step_timeout": STEP_TIMEOUT_S, "langextract_max_char_buffer": langextract_max_char_buffer},
+        {
+            "file": file,
+            "url": url,
+            "engine": engine,
+            "gemini_tier": gemini_tier,
+            "smart": smart,
+            "limit": limit,
+            "agent": agent,
+            "spark_model": spark_model,
+            "synthesis_top": synthesis_top,
+            "llm_timeout": effective_llm_timeout,
+            "step_timeout": STEP_TIMEOUT_S,
+            "langextract_fast": langextract_fast,
+            "langextract_max_char_buffer": langextract_max_char_buffer,
+            "langextract_max_workers": langextract_max_workers,
+        },
     )
 
     mode_label = "Firecrawl Agent" if agent else "Agentic Extraction"
@@ -392,6 +413,22 @@ def process(
          console.print(f"[bold red]Error:[/bold red] {msg}")
          log_event(session_id, "cli", "ERROR", msg)
          raise typer.Exit(code=1)
+    if langextract_max_char_buffer > LANGEXTRACT_MAX_CHAR_BUFFER_CAP:
+         console.print(
+             f"[yellow]Note: --langextract-max-char-buffer capped at {LANGEXTRACT_MAX_CHAR_BUFFER_CAP}.[/yellow]"
+         )
+         langextract_max_char_buffer = LANGEXTRACT_MAX_CHAR_BUFFER_CAP
+
+    if langextract_max_workers < 1:
+         msg = "--langextract-max-workers must be >= 1."
+         console.print(f"[bold red]Error:[/bold red] {msg}")
+         log_event(session_id, "cli", "ERROR", msg)
+         raise typer.Exit(code=1)
+    if langextract_max_workers > LANGEXTRACT_MAX_WORKERS_CAP:
+         console.print(
+             f"[yellow]Note: --langextract-max-workers capped at {LANGEXTRACT_MAX_WORKERS_CAP}.[/yellow]"
+         )
+         langextract_max_workers = LANGEXTRACT_MAX_WORKERS_CAP
 
     # Validate spark model for agent mode
     if agent:
@@ -580,7 +617,9 @@ def process(
                             session_id=session_id,
                             status_callback=update_workflow_status,
                             use_langextract=langextract,
+                            langextract_fast=langextract_fast,
                             langextract_max_char_buffer=langextract_max_char_buffer,
+                            langextract_max_workers=langextract_max_workers,
                             synthesis_top=synthesis_top,
                         )
 
@@ -649,6 +688,9 @@ def process(
             "spark_model": spark_model if agent else None,
             "llm_timeout": effective_llm_timeout,
             "step_timeout": STEP_TIMEOUT_S,
+            "langextract_fast": langextract_fast,
+            "langextract_max_char_buffer": langextract_max_char_buffer,
+            "langextract_max_workers": langextract_max_workers,
         },
         "urls_processed": len(urls),
         "results_count": len(results),

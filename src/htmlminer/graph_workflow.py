@@ -113,7 +113,9 @@ def run_htmlminer_workflow(
     session_id: str = None,
     status_callback: callable = None,
     use_langextract: bool = False,
+    langextract_fast: bool = False,
     langextract_max_char_buffer: int = None,
+    langextract_max_workers: int = None,
     synthesis_top: int = 50,
 ) -> dict:
     """
@@ -131,7 +133,9 @@ def run_htmlminer_workflow(
         session_id: Session ID for logging
         status_callback: Callback for status updates
         use_langextract: Whether to use LangExtract for intermediate extraction
+        langextract_fast: Whether to use LangExtract fast mode (single call per page)
         langextract_max_char_buffer: Max chars per chunk for LangExtract (optional)
+        langextract_max_workers: Max parallel LangExtract workers per page (optional)
         synthesis_top: Max snippets per feature for synthesis
     
     Returns:
@@ -151,10 +155,13 @@ def run_htmlminer_workflow(
         "session_id": session_id or "",
         "status_callback": status_callback,
         "use_langextract": use_langextract,
+        "langextract_fast": langextract_fast,
         "synthesis_top": synthesis_top,
     }
     if langextract_max_char_buffer is not None:
         initial_state["langextract_max_char_buffer"] = langextract_max_char_buffer
+    if langextract_max_workers is not None:
+        initial_state["langextract_max_workers"] = langextract_max_workers
     
     # Run the graph
     final_state = graph.invoke(initial_state)

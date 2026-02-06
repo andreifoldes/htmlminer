@@ -43,7 +43,9 @@ class HTMLMinerState(TypedDict, total=False):
     model_tier: str  # 'cheap' or 'expensive'
     model_tier: str  # 'cheap' or 'expensive'
     use_langextract: bool  # Whether to use langextract for intermediate extraction
+    langextract_fast: bool  # Whether to use langextract fast mode (single call per page)
     langextract_max_char_buffer: int  # Max chars per chunk for LangExtract
+    langextract_max_workers: int  # Max parallel LangExtract workers per page
     synthesis_top: int  # Max snippets per feature for synthesis
 
     

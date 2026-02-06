@@ -567,6 +567,10 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
     max_char_buffer = state.get("langextract_max_char_buffer", LANGEXTRACT_MAX_CHAR_BUFFER)
     if not isinstance(max_char_buffer, int) or max_char_buffer <= 0:
         max_char_buffer = LANGEXTRACT_MAX_CHAR_BUFFER
+    fast_mode = state.get("langextract_fast", False)
+    max_workers = state.get("langextract_max_workers", 1)
+    if not isinstance(max_workers, int) or max_workers < 1:
+        max_workers = 1
     
     if not scraped_pages or not features:
         return {"page_extractions": {}, "raw_counts": {}}
@@ -588,11 +592,13 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
             chunks = max(1, char_count // max_char_buffer)
             console.print(f"  {idx}. {page['url'][:60]}... ({char_count:,} chars, {chunks} chunk{'s' if chunks > 1 else ''})")
         
-        total_api_calls = len(valid_pages) * len(features)
+        calls_per_page = 1 if fast_mode else len(features)
+        total_api_calls = len(valid_pages) * calls_per_page
         # ~5s per API call average
         est_seconds = total_api_calls * 5
         est_minutes = est_seconds / 60
-        console.print(f"\n[dim]  Total: {len(valid_pages)} pages × {len(features)} features = {total_api_calls} API calls[/dim]")
+        calls_label = "1 call (fast mode)" if fast_mode else f"{len(features)} features"
+        console.print(f"\n[dim]  Total: {len(valid_pages)} pages × {calls_label} = {total_api_calls} API calls[/dim]")
         console.print(f"[dim]  Estimated time: ~{est_minutes:.1f} minutes ({total_chars:,} total chars)[/dim]\n")
     
     with StepTimingWrapper("extract_pages", session_id, url, status_callback=state.get("status_callback")) as timer:
@@ -607,63 +613,71 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
             page_start_time = time.time()
             feature_timings = []
             
-            # Process each feature separately (sequential for now)
-            for feature in features:
-                feature_name = feature["name"]
-                feature_desc = feature["description"]
-                
+            if fast_mode:
                 if state.get("status_callback"):
                     kb_size = len(content) / 1024
-                    state["status_callback"](f"Extracting '{feature_name}' from page {i+1}/{len(scraped_pages)} ({kb_size:.1f}KB)...")
-                
+                    state["status_callback"](f"Extracting all features from page {i+1}/{len(scraped_pages)} ({kb_size:.1f}KB)...")
+
                 feature_start_time = time.time()
-                with StepTimingWrapper(f"extract_{feature_name}", session_id, page_url):
+                with StepTimingWrapper("extract_fast", session_id, page_url):
                     try:
-                        # Create examples for this feature
-                        feature_examples = _create_feature_examples(feature_name, feature_desc)
-                        
-                        # Let langextract handle its own chunking internally
-                        # Use max_workers=1 to avoid parallel API calls that may cause rate limiting
-                        # Disable fuzzy_alignment which has O(n³) complexity and causes hangs
+                        feature_lines = "\n".join([
+                            f"- {f['name']}: {f['description']}"
+                            for f in features
+                        ])
+                        prompt_desc = (
+                            "Extract the following features from the text. "
+                            "Label each extraction with its feature name:\n"
+                            f"{feature_lines}"
+                        )
+                        combined_examples = []
+                        for feature in features:
+                            combined_examples.extend(
+                                _create_feature_examples(feature["name"], feature["description"])
+                            )
+
                         annotated_doc = lx.extract(
-                            content,  # Pass full content, langextract handles chunking
-                            prompt_description=feature_desc,
+                            content,
+                            prompt_description=prompt_desc,
                             model_id=model_id,
                             api_key=api_key,
-                            examples=feature_examples,
+                            examples=combined_examples,
                             extraction_passes=LANGEXTRACT_EXTRACTION_PASSES,
                             max_char_buffer=max_char_buffer,
-                            max_workers=1,  # Serialize to avoid rate limiting
+                            max_workers=max_workers,
+                            batch_length=max_workers,
                             debug=False,
-                            show_progress=False,  # Disable progress bar output
-                            resolver_params={"enable_fuzzy_alignment": False},  # Avoid O(n³) alignment
+                            show_progress=False,
+                            resolver_params={"enable_fuzzy_alignment": False},
                         )
-                        
+
                         feature_elapsed = time.time() - feature_start_time
-                        
-                        # Extract snippets from AnnotatedDocument
-                        snippets = [
-                            e.extraction_text for e in annotated_doc.extractions
-                            if e.extraction_text and len(e.extraction_text.split()) >= 5
-                        ]
-                        # Deduplicate
-                        snippets = list(dict.fromkeys(snippets))
-                        
-                        page_extractions[page_url][feature_name] = snippets
-                        raw_counts[feature_name] += len(snippets)
-                        
-                        # Show feature-level timing in status callback
+
+                        by_feature = {f["name"]: [] for f in features}
+                        for extraction in annotated_doc.extractions:
+                            if not extraction.extraction_text:
+                                continue
+                            if len(extraction.extraction_text.split()) < 5:
+                                continue
+                            feature_name = extraction.extraction_class
+                            if feature_name in by_feature:
+                                by_feature[feature_name].append(extraction.extraction_text)
+
+                        for feature_name, snippets in by_feature.items():
+                            snippets = list(dict.fromkeys(snippets))
+                            by_feature[feature_name] = snippets
+                            page_extractions[page_url][feature_name] = snippets
+                            raw_counts[feature_name] += len(snippets)
+                            feature_timings.append((feature_name, None, len(snippets)))
+
                         if state.get("status_callback"):
-                            state["status_callback"](f"  ✓ '{feature_name}' extracted in {feature_elapsed:.2f}s ({len(snippets)} snippets)")
-                        feature_timings.append((feature_name, feature_elapsed, len(snippets)))
-                        
-                        # Estimate usage (approx 4 chars/token)
-                        total_input_chars = len(content) + len(feature_desc)
-                        total_output_chars = sum(len(s) for s in snippets)
+                            state["status_callback"](f"  ✓ Fast extraction in {feature_elapsed:.2f}s")
+
+                        total_input_chars = len(content) + len(prompt_desc)
+                        total_output_chars = sum(len(s) for snippets in by_feature.values() for s in snippets)
                         est_prompt_tokens = total_input_chars // 4
                         est_completion_tokens = total_output_chars // 4
-                        
-                        # Aggregate for timer details
+
                         current_tokens = timer.details.get("tokens", {
                             "prompt_tokens": 0, "completion_tokens": 0, "total_calls": 0
                         })
@@ -671,23 +685,103 @@ def extract_pages_node(state: HTMLMinerState) -> dict:
                         current_tokens["completion_tokens"] += est_completion_tokens
                         current_tokens["total_calls"] += 1
                         timer.set_details({"tokens": current_tokens})
-
                     except Exception as e:
                         feature_elapsed = time.time() - feature_start_time
-                        feature_timings.append((feature_name, feature_elapsed, 0))
-                        # Show feature-level timing for failures too
                         if state.get("status_callback"):
-                            state["status_callback"](f"  ✗ '{feature_name}' failed in {feature_elapsed:.2f}s")
+                            state["status_callback"](f"  ✗ Fast extraction failed in {feature_elapsed:.2f}s")
                         log_event(
                             session_id, "graph", "WARNING",
-                            f"Extract failed for {feature_name} on {page_url}: {e}"
+                            f"Fast extract failed on {page_url}: {e}"
                         )
-                        page_extractions[page_url][feature_name] = []
+                        for feature in features:
+                            feature_name = feature["name"]
+                            feature_timings.append((feature_name, None, 0))
+                            page_extractions[page_url][feature_name] = []
+            else:
+                # Process each feature separately (sequential for now)
+                for feature in features:
+                    feature_name = feature["name"]
+                    feature_desc = feature["description"]
+                    
+                    if state.get("status_callback"):
+                        kb_size = len(content) / 1024
+                        state["status_callback"](f"Extracting '{feature_name}' from page {i+1}/{len(scraped_pages)} ({kb_size:.1f}KB)...")
+                    
+                    feature_start_time = time.time()
+                    with StepTimingWrapper(f"extract_{feature_name}", session_id, page_url):
+                        try:
+                            # Create examples for this feature
+                            feature_examples = _create_feature_examples(feature_name, feature_desc)
+                            
+                            # Let langextract handle its own chunking internally
+                            # Disable fuzzy_alignment which has O(n³) complexity and causes hangs
+                            annotated_doc = lx.extract(
+                                content,  # Pass full content, langextract handles chunking
+                                prompt_description=feature_desc,
+                                model_id=model_id,
+                                api_key=api_key,
+                                examples=feature_examples,
+                                extraction_passes=LANGEXTRACT_EXTRACTION_PASSES,
+                                max_char_buffer=max_char_buffer,
+                                max_workers=max_workers,
+                                batch_length=max_workers,
+                                debug=False,
+                                show_progress=False,  # Disable progress bar output
+                                resolver_params={"enable_fuzzy_alignment": False},  # Avoid O(n³) alignment
+                            )
+                            
+                            feature_elapsed = time.time() - feature_start_time
+                            
+                            # Extract snippets from AnnotatedDocument
+                            snippets = [
+                                e.extraction_text for e in annotated_doc.extractions
+                                if e.extraction_text and len(e.extraction_text.split()) >= 5
+                            ]
+                            # Deduplicate
+                            snippets = list(dict.fromkeys(snippets))
+                            
+                            page_extractions[page_url][feature_name] = snippets
+                            raw_counts[feature_name] += len(snippets)
+                            
+                            # Show feature-level timing in status callback
+                            if state.get("status_callback"):
+                                state["status_callback"](f"  ✓ '{feature_name}' extracted in {feature_elapsed:.2f}s ({len(snippets)} snippets)")
+                            feature_timings.append((feature_name, feature_elapsed, len(snippets)))
+                            
+                            # Estimate usage (approx 4 chars/token)
+                            total_input_chars = len(content) + len(feature_desc)
+                            total_output_chars = sum(len(s) for s in snippets)
+                            est_prompt_tokens = total_input_chars // 4
+                            est_completion_tokens = total_output_chars // 4
+                            
+                            # Aggregate for timer details
+                            current_tokens = timer.details.get("tokens", {
+                                "prompt_tokens": 0, "completion_tokens": 0, "total_calls": 0
+                            })
+                            current_tokens["prompt_tokens"] += est_prompt_tokens
+                            current_tokens["completion_tokens"] += est_completion_tokens
+                            current_tokens["total_calls"] += 1
+                            timer.set_details({"tokens": current_tokens})
+
+                        except Exception as e:
+                            feature_elapsed = time.time() - feature_start_time
+                            feature_timings.append((feature_name, feature_elapsed, 0))
+                            # Show feature-level timing for failures too
+                            if state.get("status_callback"):
+                                state["status_callback"](f"  ✗ '{feature_name}' failed in {feature_elapsed:.2f}s")
+                            log_event(
+                                session_id, "graph", "WARNING",
+                                f"Extract failed for {feature_name} on {page_url}: {e}"
+                            )
+                            page_extractions[page_url][feature_name] = []
             
             # Print page extraction summary
             page_elapsed = time.time() - page_start_time
             short_url = page_url[:50] + "..." if len(page_url) > 50 else page_url
-            feature_summary = " | ".join([f"{name}: {elapsed:.1f}s ({count})" for name, elapsed, count in feature_timings])
+            if fast_mode:
+                feature_summary = " | ".join([f"{name}: {count}" for name, _, count in feature_timings])
+            else:
+                feature_summary = " | ".join([f"{name}: {elapsed:.1f}s ({count})" for name, elapsed, count in feature_timings])
             console.print(f"  [green]✓[/green] Page {i+1}: {short_url} [dim]({page_elapsed:.1f}s total)[/dim]")
             console.print(f"    [dim]{feature_summary}[/dim]")
         
