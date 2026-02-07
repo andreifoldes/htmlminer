@@ -12,6 +12,7 @@ from firecrawl import FirecrawlApp
 from rich.console import Console
 
 from .database import log_event
+from .formatting import is_list_output_format, list_output_instruction, normalize_bullet_list
 
 console = Console()
 
@@ -109,7 +110,10 @@ class FirecrawlAgentExtractor:
             if length_guidance:
                 extras.append(f"Length guidance: {length_guidance}")
             if output_format:
-                extras.append(f"Output format: {output_format}")
+                if is_list_output_format(output_format):
+                    extras.append(list_output_instruction())
+                else:
+                    extras.append(f"Output format: {output_format}")
             if output_categories:
                 extras.append(f"Categories: {', '.join(output_categories)}")
             if extras:
@@ -166,6 +170,13 @@ Be thorough and look for this information across the entire website, including a
             status_callback(f"Running Firecrawl Agent ({self.model_id})...")
         
         console.print(f"[dim]Using Firecrawl Agent with model: {self.model_id}[/dim]")
+
+        def _maybe_normalize(value: object, output_format: str) -> object:
+            if not value or not isinstance(value, str):
+                return value
+            if is_list_output_format(output_format):
+                return normalize_bullet_list(value)
+            return value
         
         try:
             # Call the Firecrawl Agent API
@@ -203,16 +214,21 @@ Be thorough and look for this information across the entire website, including a
             if isinstance(data, dict):
                 for feature in features:
                     name = feature["name"]
-                    result_data[name] = data.get(name, "Not found.")
+                    output_format = feature.get("output_format", "")
+                    value = data.get(name, None)
+                    value = _maybe_normalize(value, output_format)
+                    result_data[name] = value if value else "Not found."
                     # Store as structured object with text and source
-                    raw_value = data.get(name, "")
+                    raw_value = _maybe_normalize(data.get(name, ""), output_format)
                     result_data[f"{name}_Raw"] = [{"text": raw_value, "source": url}] if raw_value else []
-                    result_data[f"{name}_Count"] = 1 if data.get(name) else 0
+                    result_data[f"{name}_Count"] = 1 if value else 0
             elif hasattr(data, '__dict__'):
                 # Pydantic model instance
                 for feature in features:
                     name = feature["name"]
+                    output_format = feature.get("output_format", "")
                     value = getattr(data, name, None)
+                    value = _maybe_normalize(value, output_format)
                     result_data[name] = value if value else "Not found."
                     # Store as structured object with text and source
                     result_data[f"{name}_Raw"] = [{"text": value, "source": url}] if value else []

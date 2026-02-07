@@ -29,6 +29,11 @@ from .crawler import (
     crawl_domain,
 )
 from .database import log_event, save_page_relevance, get_latest_snapshot
+from .formatting import (
+    is_list_output_format,
+    list_output_instruction,
+    normalize_bullet_list,
+)
 
 console = Console()
 
@@ -923,8 +928,8 @@ def synthesize_node(state: HTMLMinerState) -> dict:
             if output_format:
                 if output_format in {"number", "numeric", "integer", "float"}:
                     prompt_lines.append("Output format: number only (no units or extra text).")
-                elif output_format in {"list", "bullet_list"}:
-                    prompt_lines.append("Output format: bullet list.")
+                elif is_list_output_format(output_format):
+                    prompt_lines.append(list_output_instruction())
                 elif output_format in {"free_text", "text"}:
                     prompt_lines.append("Output format: free text.")
                 elif output_format in {"single_choice", "single_choice_category", "single"}:
@@ -953,7 +958,10 @@ def synthesize_node(state: HTMLMinerState) -> dict:
                     [HumanMessage(content=prompt)],
                     config={"callbacks": [callback]},
                 )
-                results[feature_name] = result.summary
+                summary = result.summary
+                if is_list_output_format(output_format):
+                    summary = normalize_bullet_list(summary)
+                results[feature_name] = summary
             except Exception as e:
                 log_event(session_id, "graph", "ERROR", f"Synthesis failed for {feature_name}: {e}")
                 results[feature_name] = f"Error: {str(e)}"
