@@ -10,7 +10,7 @@ console = Console()
 def save_results(results: List[Dict], output_file: str, metadata: Optional[Dict] = None):
     """
     Saves extraction results to a file.
-    For JSON: includes metadata section with dates and parameters.
+    For JSON: includes metadata section with dates, config, and parameters.
     For CSV: saves only the results data.
     """
     if not results:

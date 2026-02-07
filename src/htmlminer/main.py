@@ -1,5 +1,5 @@
 import typer
-from dotenv import load_dotenv, set_key
+from dotenv import load_dotenv, set_key, dotenv_values
 import os
 import sys
 import platform
@@ -37,11 +37,11 @@ from ._version import __version__, get_version, get_version_info
 HOME_ENV_DIR = Path.home() / ".htmlminer"
 HOME_ENV_FILE = HOME_ENV_DIR / ".env"
 
-# Load from multiple locations: CWD first, then home dir
-if Path(".env").exists():
-    load_dotenv(Path(".env"))
-elif HOME_ENV_FILE.exists():
+# Load from multiple locations: home first, then CWD overrides
+if HOME_ENV_FILE.exists():
     load_dotenv(HOME_ENV_FILE)
+if Path(".env").exists():
+    load_dotenv(Path(".env"), override=True)
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 console = Console()
@@ -59,6 +59,85 @@ _URL_REGEX = re.compile(r"https?://[^\s<>'\"\\]+")
 _URL_TRAILING_PUNCT = ".,;:!?)]}\"'"
 _URL_LEADING_PUNCT = "(['\""
 _JSON_NUMBER_RE = re.compile(r"-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?")
+
+def _resolve_env_path(path: Path) -> str:
+    try:
+        return str(path.expanduser().resolve())
+    except Exception:
+        return str(path)
+
+def _get_env_file_status(path: Path, key_name: str) -> dict:
+    status = {
+        "path": path,
+        "exists": path.exists(),
+        "has_key": False,
+        "value": None,
+        "error": None,
+    }
+    if not status["exists"]:
+        return status
+    try:
+        values = dotenv_values(path)
+    except Exception as exc:
+        status["error"] = str(exc)
+        return status
+    if key_name in values:
+        status["has_key"] = True
+        status["value"] = values.get(key_name)
+    return status
+
+def _format_env_status(label: str, status: dict, key_name: str) -> str:
+    if not status["exists"]:
+        return f"[dim]{label}: not found[/dim]"
+    if status["error"]:
+        return f"[yellow]{label}: could not read ({status['error']})[/yellow]"
+    if status["has_key"]:
+        value = status["value"]
+        value_str = "" if value is None else str(value)
+        if not value_str.strip():
+            return f"[yellow]{label}: {key_name} is set but empty (masks other sources)[/yellow]"
+        return f"[green]{label}: {key_name} is set (value hidden)[/green]"
+    return f"[dim]{label}: does not define {key_name}[/dim]"
+
+def _print_env_diagnostics(key_name: str) -> None:
+    local_env = Path(".env")
+    home_env = HOME_ENV_FILE
+    local_status = _get_env_file_status(local_env, key_name)
+    home_status = _get_env_file_status(home_env, key_name)
+    env_value = os.getenv(key_name)
+
+    console.print(
+        "[dim]Env precedence:[/dim] "
+        f"{_resolve_env_path(local_env)} (highest) > OS env > {_resolve_env_path(home_env)}"
+    )
+
+    if env_value and env_value.strip():
+        console.print(f"[green]Current environment: {key_name} is set (value hidden)[/green]")
+    else:
+        console.print(f"[yellow]Current environment: {key_name} is not set[/yellow]")
+
+    console.print(_format_env_status("Project .env", local_status, key_name))
+    console.print(_format_env_status("Home .env", home_status, key_name))
+
+    local_value = local_status.get("value")
+    local_blank = local_status.get("has_key") and (local_value is None or str(local_value).strip() == "")
+    home_value = home_status.get("value")
+    home_blank = home_status.get("has_key") and (home_value is None or str(home_value).strip() == "")
+
+    if local_blank:
+        console.print(
+            f"[yellow]Note: Project .env sets {key_name} to empty, which overrides other sources.[/yellow]"
+        )
+    elif local_status.get("has_key") and not local_blank and not env_value:
+        console.print(
+            f"[yellow]Note: Project .env defines {key_name}, but it is not in the current environment. "
+            "Check file permissions or parsing errors.[/yellow]"
+        )
+    elif home_status.get("has_key") and not home_blank and not env_value:
+        console.print(
+            f"[yellow]Note: Home .env defines {key_name}, but it is not in the current environment. "
+            "Check file permissions or parsing errors.[/yellow]"
+        )
 
 def _clean_url_candidate(candidate: str) -> str:
     if not candidate:
@@ -376,7 +455,7 @@ def _lenient_json_loads(text: str) -> object:
         raise _LenientJsonError(f"Unexpected trailing token '{token.kind}'", token.pos)
     return value
 
-def _load_config_features(config_path: str, console: Console) -> list:
+def _load_config_features(config_path: str, console: Console) -> tuple[list, dict]:
     text = Path(config_path).read_text(encoding="utf-8")
     try:
         payload = json.loads(text)
@@ -398,7 +477,7 @@ def _load_config_features(config_path: str, console: Console) -> list:
     if not isinstance(payload, dict):
         console.print(f"[bold red]Error:[/bold red] Config file must contain a JSON object: {config_path}")
         raise typer.Exit(code=1)
-    return payload.get("features", [])
+    return payload.get("features", []), payload
 
 def _check_windows_compatibility():
     """
@@ -542,12 +621,14 @@ def _prompt_for_api_key(key_name: str, description: str, url: str, required: boo
     """
     console.print()
     if required:
-        console.print(f"[bold yellow]⚠ {key_name} is required but not found in .env file[/bold yellow]")
+        console.print(f"[bold yellow]⚠ {key_name} is required but not set[/bold yellow]")
     else:
-        console.print(f"[bold blue]ℹ {key_name} not found in .env file[/bold blue]")
+        console.print(f"[bold blue]ℹ {key_name} is not set[/bold blue]")
 
     console.print(f"[dim]Get your {description} key from: {url}[/dim]")
     console.print()
+
+    _print_env_diagnostics(key_name)
 
     # Ask if user wants to skip (only if optional)
     if not required:
@@ -571,7 +652,7 @@ def _prompt_for_api_key(key_name: str, description: str, url: str, required: boo
     # Ask if user wants to save to .env
     console.print()
     save_to_env = Confirm.ask(
-        f"[bold]Save {key_name} to .env file?[/bold] (recommended for future runs)",
+        f"[bold]Save {key_name} to ~/.htmlminer/.env?[/bold] (recommended for future runs)",
         default=True
     )
 
@@ -584,6 +665,7 @@ def _prompt_for_api_key(key_name: str, description: str, url: str, required: boo
             # Use python-dotenv's set_key for proper handling
             set_key(str(env_file), key_name, api_key)
             console.print(f"[green]✓[/green] {key_name} saved to [bold]{env_file}[/bold]")
+            console.print("[dim]Note: a project-local .env can override this value.[/dim]")
 
         except Exception as e:
             console.print(f"[yellow]Warning: Could not save to .env file: {e}[/yellow]")
@@ -853,34 +935,38 @@ def process(
     if firecrawl_api_key:
         console.print(f"[dim]Firecrawl API Key:[/dim] {_mask_key(firecrawl_api_key)}")
 
-    # Default features if config.json is not found
-    DEFAULT_FEATURES = [
-        {
-            "name": "Risk",
-            "description": "Any mentioned risks, dangers, or negative impacts of AI development.",
-            "synthesis_topic": "Their risk assessment (ie what risks does AI development pose)",
-            "length": "1 short paragraph (2-4 sentences)",
-            "output_format": "free_text"
-        },
-        {
-            "name": "Goal",
-            "description": "High-level goals, missions, or objectives (e.g., 'AI alignment' or global AI agreement).",
-            "synthesis_topic": "The goals (often pretty high-level e.g. 'AI alignment')",
-            "length": "1 short paragraph (2-4 sentences)",
-            "output_format": "free_text"
-        },
-        {
-            "name": "Method",
-            "description": "Strategies, activities, or actions taken to achieve the goals (research, grantmaking, policy work, etc.).",
-            "synthesis_topic": "The methods used in service of the goals",
-            "length": "1 short paragraph (2-4 sentences)",
-            "output_format": "free_text"
-        }
-    ]
+    # Default config if config.json is not found
+    DEFAULT_CONFIG = {
+        "features": [
+            {
+                "name": "Risk",
+                "description": "Any mentioned risks, dangers, or negative impacts of AI development.",
+                "synthesis_topic": "Their risk assessment (ie what risks does AI development pose)",
+                "length": "1 short paragraph (2-4 sentences)",
+                "output_format": "free_text"
+            },
+            {
+                "name": "Goal",
+                "description": "High-level goals, missions, or objectives (e.g., 'AI alignment' or global AI agreement).",
+                "synthesis_topic": "The goals (often pretty high-level e.g. 'AI alignment')",
+                "length": "1 short paragraph (2-4 sentences)",
+                "output_format": "free_text"
+            },
+            {
+                "name": "Method",
+                "description": "Strategies, activities, or actions taken to achieve the goals (research, grantmaking, policy work, etc.).",
+                "synthesis_topic": "The methods used in service of the goals",
+                "length": "1 short paragraph (2-4 sentences)",
+                "output_format": "free_text"
+            }
+        ]
+    }
+    DEFAULT_FEATURES = DEFAULT_CONFIG["features"]
     
     # Determine config path: CLI flag > current directory > defaults
     config_path = config if config else "config.json"
     extraction_config = None
+    config_payload = None
     
     if config and not os.path.exists(config_path):
         # User specified a config file that doesn't exist
@@ -888,12 +974,13 @@ def process(
         raise typer.Exit(code=1)
     
     if os.path.exists(config_path):
-        extraction_config = _load_config_features(config_path, console)
+        extraction_config, config_payload = _load_config_features(config_path, console)
         if config:
             console.print(f"[dim]Using config: {config_path}[/dim]")
     else:
         # Use default features when config.json is not found
         extraction_config = DEFAULT_FEATURES
+        config_payload = DEFAULT_CONFIG
         console.print(f"[dim]Using default features (Risk, Goal, Method). Use --config to specify custom features.[/dim]")
     
     results = []
@@ -1046,6 +1133,9 @@ def process(
         "session_id": session_id,
         "sitemaps": sitemap_by_url,
         "relevance_scores": relevance_scores_by_url,
+        "config": config_payload,
+        "config_path": os.path.abspath(config_path) if os.path.exists(config_path) else None,
+        "config_source": "file" if os.path.exists(config_path) else "defaults",
         "parameters": {
             "engine": engine,
             "smart": smart,
