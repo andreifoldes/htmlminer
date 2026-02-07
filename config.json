@@ -20,6 +20,26 @@
             "synthesis_topic": "The methods used by the organization to service their,,, goals",
             "length": "1 short paragraph (2-4 sentences)",
             "output_format": "free_text"
+        },
+        {
+            "name": "Primary Method (single choice example)",
+            "description": "Most prominent method or activity mentioned.",
+            "synthesis_topic": "The primary method used by the organization",
+            "output_format": "single_choice",
+            "output_categories": "policy work, research papers, grantmaking, community building, product development"
+        },
+        {
+            "name": "Methods (multi choice example)",
+            "description": "All methods or activities mentioned (select all that apply).",
+            "synthesis_topic": "All methods used by the organization",
+            "output_format": "multi_choice",
+            "output_categories": [
+                "policy work",
+                "research papers",
+                "grantmaking",
+                "community building",
+                "product development"
+            ]
         }
     ]
 }

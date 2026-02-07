@@ -132,6 +132,7 @@ graph TD
 ```bash
 htmlminer process --file test_urls.md
 ```
+Supports `.md`, `.txt`, `.csv`, and `.tsv` files. Only valid `http://` or `https://` URLs are processed.
 
 ### Single URL Processing
 ```bash
@@ -187,7 +188,12 @@ After a run, the CLI prints:
 - `synthesis_topic`: how the summary for that dimension should be framed
 - `length`: optional length guidance for the model's summary
 - `output_format`: optional output style (`number`, `list`, `free_text`, `single_choice`, `multi_choice`)
-- `output_categories`: optional list of categories for `single_choice` or `multi_choice`
+- `output_categories`: optional list of categories for `single_choice` or `multi_choice` (array of strings or comma-separated string)
+
+**Output Categories Formatting**
+`output_categories` can be either:
+- Comma-separated string: `"policy work, research papers, grantmaking"`
+- JSON array: `["policy work", "research papers", "grantmaking"]`
 
 **Config file lookup order:**
 1. `--config /path/to/custom.json` - Use a specific config file
@@ -223,6 +229,26 @@ Example configuration:
             "synthesis_topic": "The methods used in service of the goals",
             "length": "1 short paragraph (2-4 sentences)",
             "output_format": "free_text"
+        },
+        {
+            "name": "Primary Method (single choice example)",
+            "description": "Most prominent method or activity mentioned.",
+            "synthesis_topic": "The primary method used by the organization",
+            "output_format": "single_choice",
+            "output_categories": "policy work, research papers, grantmaking, community building, product development"
+        },
+        {
+            "name": "Methods (multi choice example)",
+            "description": "All methods or activities mentioned (select all that apply).",
+            "synthesis_topic": "All methods used by the organization",
+            "output_format": "multi_choice",
+            "output_categories": [
+                "policy work",
+                "research papers",
+                "grantmaking",
+                "community building",
+                "product development"
+            ]
         }
     ]
 }
